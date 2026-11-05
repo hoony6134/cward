@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useRelay, clearPairing, type Snapshot, type Player, type Command } from './useRelay';
+import { useRelay, clearPairing, parsePairing, savePairing, type Snapshot, type Player, type Command } from './useRelay';
 import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, allChampions, champIcon, champIconById, champ, itemIcon,
   loadRecommended, fmtClock, eventKo, spellCd, spellIcon, sumSpellIcon, summonerSpells, loadUltCd, ultRank, profileIcon, positionIcon,
@@ -615,12 +615,19 @@ function Waiting({ status, phase }: { status: string; phase?: string | null }) {
 }
 
 function Pairing() {
+  const [v, setV] = useState('');
+  const [err, setErr] = useState(false);
+  const connect = () => { const p = parsePairing(v); if (p) savePairing(p); else setErr(true); };
   return (
     <div className="min-h-dvh grid place-items-center px-6 text-center">
-      <div className="space-y-3 max-w-sm">
+      <div className="space-y-4 max-w-sm w-full">
         <div className="font-hud text-4xl text-[var(--gold)]">WARD</div>
-        <h1 className="text-xl font-bold">페어링이 필요해요</h1>
-        <p className="text-sm text-[var(--muted)]">PC 에이전트가 출력한 페어링 링크(<code className="text-[var(--text)]">#room=…&amp;token=…</code>)를 이 폰에서 열면 연결돼요.</p>
+        <h1 className="text-xl font-bold">페어링</h1>
+        <p className="text-sm text-[var(--muted)]">PC에서 <code className="text-[var(--text)]">npm run qr</code>로 나온 <b>페어링 링크를 복사해 아래에 붙여넣으세요.</b> (설치형 앱은 링크가 자동으로 안 넘어와요.)</p>
+        <input value={v} onChange={(e) => { setV(e.target.value); setErr(false); }} placeholder="페어링 링크 붙여넣기"
+          className={`w-full px-3 py-3 rounded bg-[#0a1420] text-sm outline-none ring-1 ${err ? 'ring-[var(--red)]' : 'ring-[var(--gold-dim)]'}`} />
+        {err && <p className="text-xs text-[var(--red)]">링크에 room·token이 없어요. 전체 링크를 붙여넣어 주세요.</p>}
+        <button onClick={connect} className="btn btn-blue w-full py-3 font-bold font-hud">연결</button>
       </div>
     </div>
   );

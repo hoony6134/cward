@@ -44,15 +44,28 @@ export type Command = Record<string, unknown> & { cmd: string };
 // Pairing: room + token come from the URL fragment (#room=..&token=..) once, then
 // persist in localStorage so reopening the page just works. The fragment never
 // reaches the server, so the token isn't logged in request URLs.
+// Accepts a full pairing link, a "?..."/"#..." string, or "room=x&token=y".
+export function parsePairing(input: string): { room: string; token: string } | null {
+  const frag = (input || '').trim().split(/[#?]/).pop() || '';
+  const p = new URLSearchParams(frag);
+  const room = p.get('room'); const token = p.get('token');
+  return room && token ? { room, token } : null;
+}
+
 function readPairing(): { room: string; token: string } | null {
-  const h = new URLSearchParams(location.hash.replace(/^#/, ''));
-  const room = h.get('room'); const token = h.get('token');
-  if (room && token) {
-    localStorage.setItem('pairing', JSON.stringify({ room, token }));
-    history.replaceState(null, '', location.pathname + location.search);
-    return { room, token };
+  // Launch via link: accept token from hash OR query, save to this origin's storage.
+  const fromUrl = parsePairing(location.hash) || parsePairing(location.search);
+  if (fromUrl) {
+    try { localStorage.setItem('pairing', JSON.stringify(fromUrl)); } catch { /* ignore */ }
+    history.replaceState(null, '', location.pathname);
+    return fromUrl;
   }
   try { return JSON.parse(localStorage.getItem('pairing') || 'null'); } catch { return null; }
+}
+
+export function savePairing(p: { room: string; token: string }) {
+  try { localStorage.setItem('pairing', JSON.stringify(p)); } catch { /* ignore */ }
+  location.href = location.pathname;
 }
 
 export function clearPairing() { localStorage.removeItem('pairing'); location.reload(); }

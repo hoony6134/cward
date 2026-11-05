@@ -57,15 +57,7 @@ async function tick() {
         logKind('champ-select');
         relay.send({ ...snap, me });
       } else if (phase === 'Lobby') {
-        if (!queues.length) {
-          const [raw, maps] = await Promise.all([
-            lcuGet(lcu, '/lol-game-queues/v1/queues').catch(() => []),
-            lcuGet(lcu, '/lol-maps/v2/maps').catch(() => []),
-          ]);
-          const mapIcon = {};
-          for (const m of maps) mapIcon[m.id] ??= cdragonAsset(m.assets?.['game-select-icon-default']);
-          queues = filterQueues(raw).map((q) => ({ id: q.id, name: q.name, ai: q.ai, cat: q.cat, icon: mapIcon[q.mapId] || '' }));
-        }
+        await ensureQueues();
         logKind('lobby');
         relay.send({ ...shapeLobby(await lcuGet(lcu, '/lol-lobby/v2/lobby'), queues), me, autoAccept });
       } else if (phase === 'Matchmaking') {
@@ -77,17 +69,31 @@ async function tick() {
         logKind('ready-check' + (autoAccept ? ' (auto-accept)' : ''));
         relay.send({ kind: 'readycheck', t: Date.now(), phase, me, autoAccept });
       } else {
-        logKind('client:' + phase);
-        relay.send({ kind: 'client', t: Date.now(), phase, me, autoAccept });
+        // Client open at the main menu (None) or other non-lobby state: offer mode select.
+        await ensureQueues();
+        logKind('menu:' + phase);
+        relay.send({ kind: 'menu', t: Date.now(), phase, me, autoAccept, queues });
       }
       return schedule(idleMs);
     } catch {
       lcu = null; queues = []; me = null; // client closed or token rotated; rediscover next tick
     }
   }
-  logKind('idle');
-  relay.send({ kind: 'idle', t: Date.now(), phase: 'None' });
+  logKind('off');
+  relay.send({ kind: 'off', t: Date.now(), phase: 'None' });
   schedule(idleMs);
+}
+
+// Fetch the available queues + official mode icons once per client session.
+async function ensureQueues() {
+  if (queues.length) return;
+  const [raw, maps] = await Promise.all([
+    lcuGet(lcu, '/lol-game-queues/v1/queues').catch(() => []),
+    lcuGet(lcu, '/lol-maps/v2/maps').catch(() => []),
+  ]);
+  const mapIcon = {};
+  for (const m of maps) mapIcon[m.id] ??= cdragonAsset(m.assets?.['game-select-icon-default']);
+  queues = filterQueues(raw).map((q) => ({ id: q.id, name: q.name, ai: q.ai, cat: q.cat, icon: mapIcon[q.mapId] || '' }));
 }
 
 let timer = null;

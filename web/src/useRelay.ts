@@ -9,7 +9,7 @@ export type Player = {
 };
 export type Cell = { cellId: number; championId: number; position: string; me: boolean };
 export type Snapshot = {
-  kind?: 'ingame' | 'lobby' | 'champselect' | 'readycheck' | 'searching' | 'client' | 'idle';
+  kind?: 'ingame' | 'lobby' | 'champselect' | 'readycheck' | 'searching' | 'menu' | 'off' | 'client' | 'idle';
   t: number; phase: string | null;
   me?: { name: string; tag: string; iconId: number; level: number };
   autoAccept?: boolean;

@@ -62,7 +62,8 @@ export default function App() {
           : kind === 'lobby' ? <Lobby snap={snap} ready={ready} send={send} />
           : kind === 'readycheck' ? <ReadyCheck send={send} />
           : kind === 'searching' ? <Searching snap={snap} send={send} />
-          : <Waiting status={status} phase={snap.phase} />}
+          : kind === 'menu' ? <Menu snap={snap} send={send} />
+          : <Waiting status={status} clientOff={kind === 'off' || kind === 'idle'} phase={snap.phase} />}
       </div>
 
       <button onClick={clearPairing} className="mt-8 mx-auto block text-xs text-[var(--muted)]/60 underline">페어링 해제</button>
@@ -72,7 +73,7 @@ export default function App() {
 
 function headerLabel(snap: Snapshot | null) {
   if (!snap) return '';
-  return ({ ingame: '', lobby: '로비', champselect: '챔피언 선택', readycheck: '수락', searching: '매칭 중' } as Record<string, string>)[snap.kind || ''] || '';
+  return ({ ingame: '', lobby: '로비', champselect: '챔피언 선택', readycheck: '수락', searching: '매칭 중', menu: '메뉴' } as Record<string, string>)[snap.kind || ''] || '';
 }
 
 function Dot({ status }: { status: string }) {
@@ -293,40 +294,57 @@ function EventFeed({ snap }: { snap: Snapshot }) {
 
 /* ---------------- Lobby ---------------- */
 
-function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c: Command) => void }) {
+// Reusable grouped mode picker with pending shimmer (used in lobby and menu).
+function ModePicker({ snap, send }: { snap: Snapshot; send: (c: Command) => void }) {
   const modes = snap.queues ?? [];
-  const [pick, setPick] = useState<{ slot: number } | null>(null);
-  const [spellPick, setSpellPick] = useState<{ slot: number } | null>(null);
   const [pendingMode, setPendingMode] = useState<number | null>(null);
   useEffect(() => { if (pendingMode != null && snap.queueId === pendingMode) setPendingMode(null); }, [snap.queueId, pendingMode]);
   const GROUPS: [string, string][] = [['sr', '소환사의 협곡'], ['aram', '칼바람 나락'], ['special', '특별 모드 / 기타'], ['ai', 'AI 상대대전']];
   return (
-    <main className="px-3 space-y-3 mt-3">
-      <Panel title="게임 모드">
-        {modes.length ? GROUPS.map(([cat, label]) => {
-          const inCat = modes.filter((q) => (q.cat ?? 'special') === cat);
-          if (!inCat.length) return null;
-          return (
-            <div key={cat} className="mb-3 last:mb-0">
-              <div className="text-xs text-[var(--muted)] mb-1.5">{label}</div>
-              <div className="grid grid-cols-2 gap-2">
-                {inCat.map((q) => {
-                  const pending = pendingMode === q.id && snap.queueId !== q.id;
-                  return (
-                    <button key={q.id} disabled={pending}
-                      onClick={() => { setPendingMode(q.id); send({ cmd: 'setMode', queueId: q.id }); }}
-                      className={`relative overflow-hidden btn flex items-center gap-2 px-3 py-2 text-sm text-left ${snap.queueId === q.id ? 'btn-gold' : 'bg-[#122235] text-[var(--text)]'}`}>
-                      {q.icon && <img src={q.icon} className="w-6 h-6 shrink-0" />}
-                      <span className="truncate">{q.ai ? q.name.replace(/^AI · /, '') : q.name}</span>
-                      {pending && <span className="skeleton absolute inset-0 opacity-60" />}
-                    </button>
-                  );
-                })}
-              </div>
+    <Panel title="게임 모드">
+      {modes.length ? GROUPS.map(([cat, label]) => {
+        const inCat = modes.filter((q) => (q.cat ?? 'special') === cat);
+        if (!inCat.length) return null;
+        return (
+          <div key={cat} className="mb-3 last:mb-0">
+            <div className="text-xs text-[var(--muted)] mb-1.5">{label}</div>
+            <div className="grid grid-cols-2 gap-2">
+              {inCat.map((q) => {
+                const pending = pendingMode === q.id && snap.queueId !== q.id;
+                return (
+                  <button key={q.id} disabled={pending}
+                    onClick={() => { setPendingMode(q.id); send({ cmd: 'setMode', queueId: q.id }); }}
+                    className={`relative overflow-hidden btn flex items-center gap-2 px-3 py-2 text-sm text-left ${snap.queueId === q.id ? 'btn-gold' : 'bg-[#122235] text-[var(--text)]'}`}>
+                    {q.icon && <img src={q.icon} className="w-6 h-6 shrink-0" />}
+                    <span className="truncate">{q.ai ? q.name.replace(/^AI · /, '') : q.name}</span>
+                    {pending && <span className="skeleton absolute inset-0 opacity-60" />}
+                  </button>
+                );
+              })}
             </div>
-          );
-        }) : <div className="grid grid-cols-2 gap-2">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-11" />)}</div>}
-      </Panel>
+          </div>
+        );
+      }) : <div className="grid grid-cols-2 gap-2">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-11" />)}</div>}
+    </Panel>
+  );
+}
+
+// Client open at main menu (no lobby yet): pick a mode to create a lobby from the phone.
+function Menu({ snap, send }: { snap: Snapshot; send: (c: Command) => void }) {
+  return (
+    <main className="px-3 space-y-3 mt-3">
+      <p className="text-sm text-[var(--muted)] text-center">모드를 선택하면 PC에 로비가 생성돼요.</p>
+      <ModePicker snap={snap} send={send} />
+    </main>
+  );
+}
+
+function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c: Command) => void }) {
+  const [pick, setPick] = useState<{ slot: number } | null>(null);
+  const [spellPick, setSpellPick] = useState<{ slot: number } | null>(null);
+  return (
+    <main className="px-3 space-y-3 mt-3">
+      <ModePicker snap={snap} send={send} />
 
       {snap.quickPlay && snap.slots?.length ? (
         <Panel title="챔피언 · 스펠 · 라인 (신속 대전)">
@@ -602,14 +620,13 @@ function Searching({ snap, send }: { snap: Snapshot; send: (c: Command) => void 
   );
 }
 
-function Waiting({ status, phase }: { status: string; phase?: string | null }) {
-  const off = !phase || phase === 'None';
+function Waiting({ status, clientOff, phase }: { status: string; clientOff: boolean; phase?: string | null }) {
   return (
     <div className="flex flex-col items-center justify-center text-center gap-2 mt-24 px-6">
       <div className="font-hud text-3xl text-[var(--gold)]">WARD</div>
-      <p className="text-[var(--text)] font-medium mt-2">{off ? 'PC 클라이언트 꺼짐' : '대기 중'}</p>
-      <p className="text-sm text-[var(--muted)]">{off ? 'PC에서 롤 클라이언트를 켜면 자동으로 연결돼요.' : '클라이언트에서 로비/게임을 시작하면 자동 표시돼요.'}</p>
-      <p className="text-xs text-[var(--muted)]/60">서버 연결: {status}{off ? '' : ` · ${phase}`}</p>
+      <p className="text-[var(--text)] font-medium mt-2">{clientOff ? 'PC 클라이언트 꺼짐' : '대기 중'}</p>
+      <p className="text-sm text-[var(--muted)]">{clientOff ? 'PC에서 롤 클라이언트를 켜면 자동으로 연결돼요.' : '게임을 시작하면 자동으로 표시돼요.'}</p>
+      <p className="text-xs text-[var(--muted)]/60">서버 연결: {status}{clientOff || !phase ? '' : ` · ${phase}`}</p>
     </div>
   );
 }

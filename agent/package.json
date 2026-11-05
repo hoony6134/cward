@@ -1,0 +1,14 @@
+{
+  "name": "lol-companion-agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env src/index.mjs",
+    "test": "node ../shared/snapshot.test.mjs",
+    "qr": "node qr.mjs"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "ws": "^8.18.0"
+  }
+}

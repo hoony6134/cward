@@ -1,0 +1,144 @@
+// Headless local agent. Forwards state to the relay and executes phone commands:
+//  - in a game: Live Client Data (:2999), no auth needed
+//  - in client (lobby / champ select): LCU API via discovered port + token
+import { shapeSnapshot } from '../../shared/snapshot.mjs';
+import { shapeLobby, shapeChampSelect, filterQueues, cdragonAsset } from '../../shared/clientstate.mjs';
+import { getAllGameData } from './liveclient.mjs';
+import { discoverLCU, lcuGet, lcuPost, lcuPatch, lcuPut, lcuDelete } from './lcu.mjs';
+import { createRelay } from './relay.mjs';
+
+const { RELAY_WS_URL, ROOM, ROOM_TOKEN, POLL_MS = '1500', IDLE_POLL_MS = '2000' } = process.env;
+if (!RELAY_WS_URL || !ROOM || !ROOM_TOKEN) {
+  console.error('Missing config. Set RELAY_WS_URL, ROOM, ROOM_TOKEN (see .env.example).');
+  process.exit(1);
+}
+const pollMs = Number(POLL_MS);
+const idleMs = Number(IDLE_POLL_MS);
+
+let lcu = null;          // {port, token}
+let lastAction = null;   // current champ-select action id for pick/ban commands
+let lastKind = '';
+let queues = [];         // available matchmade queues, fetched once per client session
+let me = null;           // {name, tag, iconId, level}, fetched once per client session
+let autoAccept = true;   // toggled from the phone
+
+const relay = createRelay({
+  url: RELAY_WS_URL, room: ROOM, token: ROOM_TOKEN,
+  onStatus: (s) => console.log('[relay]', s),
+  onCommand: (c) => runCommand(c).catch((e) => console.log('[cmd] failed:', c.cmd, e.message)).finally(refreshSoon),
+});
+console.log(`[agent] room=${ROOM}`);
+
+const logKind = (k) => { if (k !== lastKind) { console.log('[agent]', k); lastKind = k; } };
+
+async function tick() {
+  try {
+    // 1) In an active game — richest data, no auth.
+    const data = await getAllGameData();
+    logKind('in-game');
+    relay.send(shapeSnapshot(data, 'InProgress'));
+    return schedule(pollMs);
+  } catch { /* not in game */ }
+
+  // 2) Client up — read phase and shape lobby / champ-select.
+  if (!lcu) lcu = await discoverLCU();
+  if (lcu) {
+    try {
+      if (!me) me = await getMe();
+      const phase = await lcuGet(lcu, '/lol-gameflow/v1/gameflow-phase');
+      if (phase === 'ChampSelect') {
+        const [session, pickable, bannable] = await Promise.all([
+          lcuGet(lcu, '/lol-champ-select/v1/session'),
+          lcuGet(lcu, '/lol-champ-select/v1/pickable-champion-ids').catch(() => []),
+          lcuGet(lcu, '/lol-champ-select/v1/bannable-champion-ids').catch(() => []),
+        ]);
+        const snap = shapeChampSelect(session, pickable, bannable);
+        lastAction = snap.myAction?.id ?? null;
+        logKind('champ-select');
+        relay.send({ ...snap, me });
+      } else if (phase === 'Lobby') {
+        if (!queues.length) {
+          const [raw, maps] = await Promise.all([
+            lcuGet(lcu, '/lol-game-queues/v1/queues').catch(() => []),
+            lcuGet(lcu, '/lol-maps/v2/maps').catch(() => []),
+          ]);
+          const mapIcon = {};
+          for (const m of maps) mapIcon[m.id] ??= cdragonAsset(m.assets?.['game-select-icon-default']);
+          queues = filterQueues(raw).map((q) => ({ id: q.id, name: q.name, ai: q.ai, cat: q.cat, icon: mapIcon[q.mapId] || '' }));
+        }
+        logKind('lobby');
+        relay.send({ ...shapeLobby(await lcuGet(lcu, '/lol-lobby/v2/lobby'), queues), me, autoAccept });
+      } else if (phase === 'Matchmaking') {
+        const s = await lcuGet(lcu, '/lol-matchmaking/v1/search').catch(() => ({}));
+        logKind('searching');
+        relay.send({ kind: 'searching', t: Date.now(), phase, me, autoAccept, queueTime: Math.round(s.timeInQueue ?? 0), estTime: Math.round(s.estimatedQueueTime ?? 0) });
+      } else if (phase === 'ReadyCheck') {
+        if (autoAccept) lcuPost(lcu, '/lol-matchmaking/v1/ready-check/accept').catch(() => {});
+        logKind('ready-check' + (autoAccept ? ' (auto-accept)' : ''));
+        relay.send({ kind: 'readycheck', t: Date.now(), phase, me, autoAccept });
+      } else {
+        logKind('client:' + phase);
+        relay.send({ kind: 'client', t: Date.now(), phase, me, autoAccept });
+      }
+      return schedule(idleMs);
+    } catch {
+      lcu = null; queues = []; me = null; // client closed or token rotated; rediscover next tick
+    }
+  }
+  logKind('idle');
+  relay.send({ kind: 'idle', t: Date.now(), phase: 'None' });
+  schedule(idleMs);
+}
+
+let timer = null;
+const schedule = (ms) => { timer = setTimeout(tick, ms); };
+const refreshSoon = () => { clearTimeout(timer); timer = setTimeout(tick, 150); }; // push updated state right after a command
+
+async function getMe() {
+  try {
+    const s = await lcuGet(lcu, '/lol-summoner/v1/current-summoner');
+    return { name: s.gameName || s.displayName || '', tag: s.tagLine || '', iconId: s.profileIconId ?? 0, level: s.summonerLevel ?? 0 };
+  } catch { return null; }
+}
+
+// Phone -> agent commands. Each maps to one LCU write.
+async function runCommand({ cmd, ...a }) {
+  if (cmd === 'setAutoAccept') { autoAccept = !!a.on; console.log('[cmd] autoAccept', autoAccept); return; }
+  if (!lcu) lcu = await discoverLCU();
+  if (!lcu) return console.log('[cmd] no client for', cmd);
+  console.log('[cmd]', cmd, a);
+  switch (cmd) {
+    case 'setMode':       return void (await lcuPost(lcu, '/lol-lobby/v2/lobby', { queueId: a.queueId }));
+    case 'setPosition':   return void (await lcuPut(lcu, '/lol-lobby/v2/lobby/members/localMember/position-preferences', { firstPreference: a.first, secondPreference: a.second }));
+    case 'startQueue':    return void (await lcuPost(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
+    case 'stopQueue':     return void (await lcuDelete(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
+    case 'acceptReady':   return void (await lcuPost(lcu, '/lol-matchmaking/v1/ready-check/accept'));
+    case 'declineReady':  return void (await lcuPost(lcu, '/lol-matchmaking/v1/ready-check/decline'));
+    case 'setSlotChampion': { // Swiftplay/Quickplay: change one pre-pick slot's champion
+      const slots = (await lcuGet(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots')).map((s) => ({ ...s }));
+      if (!slots[a.index]) return console.log('[cmd] no slot', a.index);
+      slots[a.index].championId = a.championId;
+      return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
+    }
+    case 'setSlotSpells': { // change a slot's summoner spells
+      const slots = (await lcuGet(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots')).map((s) => ({ ...s }));
+      if (!slots[a.index]) return console.log('[cmd] no slot', a.index);
+      slots[a.index].spell1 = a.spell1; slots[a.index].spell2 = a.spell2;
+      return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
+    }
+    case 'setSlotPosition': { // Swiftplay: change a slot's lane preference
+      const slots = (await lcuGet(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots')).map((s) => ({ ...s }));
+      if (!slots[a.index]) return console.log('[cmd] no slot', a.index);
+      slots[a.index].positionPreference = a.position;
+      return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
+    }
+    case 'pick':
+    case 'ban':
+      if (lastAction == null) return console.log('[cmd] no active action');
+      return void (await lcuPatch(lcu, `/lol-champ-select/v1/session/actions/${lastAction}`, { championId: a.championId, completed: !!a.lock }));
+    default: console.log('[cmd] unknown', cmd);
+  }
+}
+
+tick();
+process.on('SIGINT', () => { console.log('\n[agent] bye'); relay.close(); process.exit(0); });

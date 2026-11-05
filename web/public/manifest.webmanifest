@@ -1,0 +1,14 @@
+{
+  "name": "Ward",
+  "short_name": "Ward",
+  "description": "League 컴패니언 — 로비·챔프선택 조작, 인게임 오버레이",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070d16",
+  "theme_color": "#070d16",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

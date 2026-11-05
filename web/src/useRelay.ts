@@ -1,0 +1,89 @@
+import { useEffect, useRef, useState } from 'react';
+
+export type Spell = { name: string; key: string };
+export type Player = {
+  riotId: string; name: string; champion: string; champKey: string;
+  team: 'ORDER' | 'CHAOS'; position: string; level: number; isBot: boolean;
+  dead: boolean; respawn: number; k: number; d: number; a: number; cs: number; ward: number;
+  spells: Spell[]; items: { id: number; name: string; count: number }[];
+};
+export type Cell = { cellId: number; championId: number; position: string; me: boolean };
+export type Snapshot = {
+  kind?: 'ingame' | 'lobby' | 'champselect' | 'readycheck' | 'searching' | 'client' | 'idle';
+  t: number; phase: string | null;
+  me?: { name: string; tag: string; iconId: number; level: number };
+  autoAccept?: boolean;
+  // in-game
+  game?: { mode: string; mapId: number | null; time: number };
+  active?: null | {
+    riotId: string; level: number; gold: number; hp: number; maxHp: number;
+    resourceType: string; res: number; maxRes: number;
+    abilities: { Q: number; W: number; E: number; R: number };
+  };
+  players?: Player[];
+  objectives?: { dragons: { type: string; time: number }[]; barons: number; heralds: number; atakhan: number; towers: { ORDER: number; CHAOS: number } };
+  recent?: { id: number; name: string; time: number }[];
+  // lobby
+  queues?: { id: number; name: string; ai?: boolean; icon?: string; cat?: string }[];
+  queueId?: number | null; queueName?: string; mode?: string; maxSize?: number | null;
+  canPickPosition?: boolean; positions?: { first: string; second: string };
+  quickPlay?: boolean;
+  slots?: { championId: number; spell1: number; spell2: number; position: string }[];
+  members?: { name: string; leader: boolean; ready: boolean; first: string; second: string }[];
+  // searching
+  queueTime?: number; estTime?: number;
+  // champ-select
+  timeLeft?: number; timerPhase?: string;
+  myAction?: null | { id: number; type: string; championId: number };
+  myTeam?: Cell[]; theirTeam?: Cell[];
+  bans?: { mine: number[]; theirs: number[] };
+  pickable?: number[]; bannable?: number[];
+};
+export type Command = Record<string, unknown> & { cmd: string };
+
+// Pairing: room + token come from the URL fragment (#room=..&token=..) once, then
+// persist in localStorage so reopening the page just works. The fragment never
+// reaches the server, so the token isn't logged in request URLs.
+function readPairing(): { room: string; token: string } | null {
+  const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const room = h.get('room'); const token = h.get('token');
+  if (room && token) {
+    localStorage.setItem('pairing', JSON.stringify({ room, token }));
+    history.replaceState(null, '', location.pathname + location.search);
+    return { room, token };
+  }
+  try { return JSON.parse(localStorage.getItem('pairing') || 'null'); } catch { return null; }
+}
+
+export function clearPairing() { localStorage.removeItem('pairing'); location.reload(); }
+
+export function useRelay(baseWsUrl: string) {
+  const [snap, setSnap] = useState<Snapshot | null>(null);
+  const [status, setStatus] = useState<'연결 중' | '연결됨' | '끊김' | '페어링 필요'>('연결 중');
+  const pairing = useRef(readPairing());
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const p = pairing.current;
+    if (!p) { setStatus('페어링 필요'); return; }
+    let closed = false; let backoff = 1000; let timer: number;
+
+    const connect = () => {
+      if (closed) return;
+      const ws = new WebSocket(`${baseWsUrl}?room=${encodeURIComponent(p.room)}&role=viewer&token=${encodeURIComponent(p.token)}`);
+      wsRef.current = ws;
+      ws.onopen = () => { backoff = 1000; setStatus('연결됨'); };
+      ws.onmessage = (e) => { try { setSnap(JSON.parse(e.data)); } catch { /* ignore */ } };
+      ws.onclose = () => { setStatus('끊김'); if (!closed) timer = setTimeout(connect, backoff = Math.min(backoff * 2, 15000)); };
+      ws.onerror = () => { try { ws.close(); } catch { /* noop */ } };
+    };
+    connect();
+    return () => { closed = true; clearTimeout(timer); try { wsRef.current?.close(); } catch { /* noop */ } };
+  }, [baseWsUrl]);
+
+  const send = (c: Command) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(c));
+  };
+  return { snap, status, paired: !!pairing.current, send };
+}

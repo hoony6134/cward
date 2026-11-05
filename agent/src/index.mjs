@@ -21,6 +21,8 @@ let lastKind = '';
 let queues = [];         // available matchmade queues, fetched once per client session
 let recPos = null;       // {championId: ["MIDDLE",...]} Riot's recommended lanes
 let me = null;           // {name, tag, iconId, level}, fetched once per client session
+let sid = null;          // numeric summonerId, for inventory lookups
+let skinCache = {};      // {championId: [{id,name,base}]} owned skins
 let autoAccept = true;   // toggled from the phone
 
 const relay = createRelay({
@@ -57,11 +59,16 @@ async function tick() {
         lastAction = snap.myAction?.id ?? null;
         await ensureRecPos();
         logKind('champ-select');
-        relay.send({ ...snap, me, recPos });
+        relay.send({ ...snap, me, recPos, owned: await ensureOwned() });
       } else if (phase === 'Lobby') {
         await ensureQueues(); await ensureRecPos();
+        const lob = shapeLobby(await lcuGet(lcu, '/lol-lobby/v2/lobby'), queues);
+        if (lob.quickPlay) for (const s of lob.slots) {
+          s.skins = await ensureSkins(s.championId);
+          s.recSets = await ensureRecSets(s.championId, s.position, lob.mapId);
+        }
         logKind('lobby');
-        relay.send({ ...shapeLobby(await lcuGet(lcu, '/lol-lobby/v2/lobby'), queues), me, autoAccept, recPos });
+        relay.send({ ...lob, me, autoAccept, recPos, owned: await ensureOwned() });
       } else if (phase === 'Matchmaking') {
         const s = await lcuGet(lcu, '/lol-matchmaking/v1/search').catch(() => ({}));
         logKind('searching');
@@ -78,7 +85,8 @@ async function tick() {
       }
       return schedule(idleMs);
     } catch {
-      lcu = null; queues = []; me = null; recPos = null; // client closed or token rotated; rediscover next tick
+      lcu = null; queues = []; me = null; recPos = null; owned = null; sid = null; skinCache = {}; // client closed; rediscover next tick
+      for (const k in recSetCache) delete recSetCache[k];
     }
   }
   logKind('off');
@@ -105,6 +113,21 @@ async function ensureRecPos() {
   recPos = Object.fromEntries(Object.entries(r).map(([id, v]) => [id, v.recommendedPositions || []]));
 }
 
+// Riot's recommended rune+spell sets for a champion/position (several to choose from).
+const recSetCache = {};
+async function ensureRecSets(championId, position, mapId) {
+  const key = `${championId}:${position}:${mapId}`;
+  if (recSetCache[key]) return recSetCache[key];
+  const pages = await lcuGet(lcu, `/lol-perks/v1/recommended-pages/champion/${championId}/position/${position}/map/${mapId}`).catch(() => []);
+  return (recSetCache[key] = pages.slice(0, 4).map((pg) => ({
+    keyIcon: cdragonAsset(pg.keystone?.iconPath),
+    perkIds: pg.perks.map((x) => x.id),
+    perkStyle: pg.primaryPerkStyleId,
+    perkSubStyle: pg.secondaryPerkStyleId,
+    spells: pg.summonerSpellIds || [],
+  })));
+}
+
 let timer = null;
 const schedule = (ms) => { timer = setTimeout(tick, ms); };
 const refreshSoon = () => { clearTimeout(timer); timer = setTimeout(tick, 150); }; // push updated state right after a command
@@ -112,8 +135,24 @@ const refreshSoon = () => { clearTimeout(timer); timer = setTimeout(tick, 150); 
 async function getMe() {
   try {
     const s = await lcuGet(lcu, '/lol-summoner/v1/current-summoner');
+    sid = s.summonerId;
     return { name: s.gameName || s.displayName || '', tag: s.tagLine || '', iconId: s.profileIconId ?? 0, level: s.summonerLevel ?? 0 };
   } catch { return null; }
+}
+
+let owned = null; // owned champion ids
+async function ensureOwned() {
+  if (owned) return owned;
+  const list = await lcuGet(lcu, '/lol-champions/v1/owned-champions-minimal').catch(() => []);
+  owned = list.map((c) => c.id);
+  return owned;
+}
+
+async function ensureSkins(championId) {
+  if (skinCache[championId]) return skinCache[championId];
+  if (!sid || !championId) return [];
+  const skins = await lcuGet(lcu, `/lol-champions/v1/inventories/${sid}/champions/${championId}/skins`).catch(() => []);
+  return (skinCache[championId] = skins.filter((s) => s.ownership?.owned).map((s) => ({ id: s.id, name: s.name, base: !!s.isBase })));
 }
 
 // Phone -> agent commands. Each maps to one LCU write.
@@ -147,16 +186,18 @@ async function runCommand({ cmd, ...a }) {
       slots[a.index].positionPreference = a.position;
       return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
     }
-    case 'applyRecommended': { // Swiftplay: apply Riot's recommended runes (+spells) to a slot
-      const mapId = (await lcuGet(lcu, '/lol-lobby/v2/lobby')).gameConfig?.mapId ?? 11;
+    case 'setSlotSkin': { // Swiftplay: set an owned skin on a slot
+      const slots = (await lcuGet(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots')).map((s) => ({ ...s }));
+      if (!slots[a.index]) return console.log('[cmd] no slot', a.index);
+      slots[a.index].skinId = a.skinId;
+      return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
+    }
+    case 'applyRecommendedSet': { // Swiftplay: apply a chosen recommended rune+spell set
       const slots = (await lcuGet(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots')).map((s) => ({ ...s }));
       const slot = slots[a.index];
       if (!slot) return console.log('[cmd] no slot', a.index);
-      const pages = await lcuGet(lcu, `/lol-perks/v1/recommended-pages/champion/${slot.championId}/position/${slot.positionPreference}/map/${mapId}`).catch(() => []);
-      const pg = pages[0];
-      if (!pg) return console.log('[cmd] no recommendation');
-      slot.perks = JSON.stringify({ perkIds: pg.perks.map((x) => x.id), perkStyle: pg.primaryPerkStyleId, perkSubStyle: pg.secondaryPerkStyleId });
-      if (pg.summonerSpellIds?.length === 2) { slot.spell1 = pg.summonerSpellIds[0]; slot.spell2 = pg.summonerSpellIds[1]; }
+      slot.perks = JSON.stringify({ perkIds: a.perkIds, perkStyle: a.perkStyle, perkSubStyle: a.perkSubStyle });
+      if (a.spell1 && a.spell2) { slot.spell1 = a.spell1; slot.spell2 = a.spell2; }
       return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
     }
     case 'pick':

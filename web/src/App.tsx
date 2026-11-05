@@ -40,8 +40,9 @@ export default function App() {
 
   return (
     <div className="min-h-dvh pb-12">
-      <div className="topbar">{status !== '연결됨' && <i />}</div>
-      <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 bg-[#070d16]/90 backdrop-blur border-b hair">
+      <div className="sticky top-0 z-10 bg-[#070d16]/90 backdrop-blur border-b hair" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="topbar">{status !== '연결됨' && <i />}</div>
+        <header className="flex items-center gap-2 px-4 py-3">
         <span className="font-hud text-xl font-bold text-[var(--gold)]">WARD</span>
         <span className="text-xs text-[var(--muted)] tracking-wide">{headerLabel(snap)}</span>
         {snap?.me?.name && ready && kind !== 'ingame' && (
@@ -53,7 +54,8 @@ export default function App() {
         {kind === 'ingame' && <span className="ml-auto font-mono text-xl tabular-nums text-[var(--gold-br)]">{fmtClock(snap!.game?.time ?? 0)}</span>}
         <NotifBell className={kind === 'ingame' ? '' : 'ml-auto'} />
         <Dot status={status} />
-      </header>
+        </header>
+      </div>
 
       <div className="enter" key={kind}>
         {!snap ? <Loading />
@@ -342,6 +344,7 @@ function Menu({ snap, send }: { snap: Snapshot; send: (c: Command) => void }) {
 function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c: Command) => void }) {
   const [pick, setPick] = useState<{ slot: number } | null>(null);
   const [spellPick, setSpellPick] = useState<{ slot: number } | null>(null);
+  const [skinPick, setSkinPick] = useState<{ slot: number } | null>(null);
   return (
     <main className="px-3 space-y-3 mt-3">
       <ModePicker snap={snap} send={send} />
@@ -374,8 +377,25 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                       );
                     })}
                   </div>
+                  {s.recSets?.length ? (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-[var(--muted)]">추천 룬·스펠</span>
+                      {s.recSets.map((set, si) => (
+                        <button key={si} title="이 추천 세트 적용"
+                          onClick={() => send({ cmd: 'applyRecommendedSet', index: i, perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle, spell1: set.spells[0], spell2: set.spells[1] })}
+                          className="flex items-center gap-0.5 btn btn-ghost px-1.5 py-1">
+                          {set.keyIcon && <img src={set.keyIcon} className="w-5 h-5" />}
+                          {ready && set.spells.map((sp, j) => sp ? <img key={j} src={sumSpellIcon(sp)} className="w-3.5 h-3.5 rounded-sm" /> : null)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={() => send({ cmd: 'applyRecommended', index: i })} className="btn btn-ghost text-xs px-2 py-1">추천 룬·스펠</button>
+                    {s.skins?.length ? (
+                      <button onClick={() => setSkinPick({ slot: i })} className="btn btn-ghost text-xs px-2 py-1">
+                        스킨: {s.skins.find((sk) => sk.id === s.skinId)?.name || '기본'}
+                      </button>
+                    ) : null}
                     <SlotItemReco champId={s.championId} mapId={snap.mapId ?? 11} ready={ready} />
                   </div>
                 </div>
@@ -408,11 +428,16 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
 
       <button onClick={() => send({ cmd: 'startQueue' })} className="btn btn-blue w-full py-3 font-bold text-lg font-hud tracking-wide">대전 찾기</button>
 
-      {pick && <ChampPickerModal lane={snap.slots?.[pick.slot]?.position || ''} recPos={snap.recPos} onClose={() => setPick(null)}
+      {pick && <ChampPickerModal lane={snap.slots?.[pick.slot]?.position || ''} recPos={snap.recPos} owned={snap.owned} onClose={() => setPick(null)}
         onPick={(championId) => { send({ cmd: 'setSlotChampion', index: pick.slot, championId }); setPick(null); }} />}
       {spellPick && snap.slots?.[spellPick.slot] && (
         <SpellPickerModal current={[snap.slots[spellPick.slot].spell1, snap.slots[spellPick.slot].spell2]} onClose={() => setSpellPick(null)}
           onPick={(spell1, spell2) => send({ cmd: 'setSlotSpells', index: spellPick.slot, spell1, spell2 })} />
+      )}
+      {skinPick && snap.slots?.[skinPick.slot] && (
+        <SkinPickerModal skins={snap.slots[skinPick.slot].skins || []} current={snap.slots[skinPick.slot].skinId}
+          champKey={champ(snap.slots[skinPick.slot].championId)?.key || ''} onClose={() => setSkinPick(null)}
+          onPick={(skinId) => { send({ cmd: 'setSlotSkin', index: skinPick.slot, skinId }); setSkinPick(null); }} />
       )}
     </main>
   );
@@ -542,13 +567,17 @@ function getFav(pos: string): number[] { try { return JSON.parse(localStorage.ge
 function setFav(pos: string, ids: number[]) { try { localStorage.setItem(favKey(pos), JSON.stringify(ids)); } catch { /* ignore */ } }
 
 // Full-roster picker (for Swiftplay slots): all champions + per-lane favorites + Riot's lane recommendations.
-function ChampPickerModal({ lane, recPos, onClose, onPick }: { lane: string; recPos?: Record<string, string[]>; onClose: () => void; onPick: (id: number) => void }) {
+function ChampPickerModal({ lane, recPos, owned, onClose, onPick }: { lane: string; recPos?: Record<string, string[]>; owned?: number[]; onClose: () => void; onPick: (id: number) => void }) {
   const [fav, setFavState] = useState(() => getFav(lane));
   const [q, setQ] = useState('');
   const [recOnly, setRecOnly] = useState(false);
+  const ownedSet = new Set(owned ?? []);
+  const has = (id: number) => !owned || ownedSet.has(id); // treat as owned if list absent
   const all = allChampions();
   const rec = (id: number) => recPos?.[String(id)]?.includes(lane);
-  const list = all.filter((c) => (!q || c.name.includes(q)) && (!recOnly || !lane || rec(c.id)));
+  const list = all
+    .filter((c) => (!q || c.name.includes(q)) && (!recOnly || !lane || rec(c.id)))
+    .sort((a, b) => (has(b.id) ? 1 : 0) - (has(a.id) ? 1 : 0)); // owned first
   const toggle = (id: number) => { const n = fav.includes(id) ? fav.filter((x) => x !== id) : [...fav, id]; setFav(lane, n); setFavState(n); };
   return (
     <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
@@ -576,10 +605,29 @@ function ChampPickerModal({ lane, recPos, onClose, onPick }: { lane: string; rec
         <div className="grid grid-cols-5 gap-1.5 overflow-y-auto">
           {list.map((c) => (
             <div key={c.id} className="relative">
-              <button onClick={() => onPick(c.id)} className="w-full"><img src={champIconById(c.id)} alt={c.name} className="w-full aspect-square rounded" loading="lazy" /></button>
+              <button onClick={() => onPick(c.id)} className="w-full"><img src={champIconById(c.id)} alt={c.name} className={`w-full aspect-square rounded ${has(c.id) ? '' : 'grayscale opacity-40'}`} loading="lazy" /></button>
               <button onClick={() => toggle(c.id)} title="즐겨찾기"
                 className={`absolute top-0.5 right-0.5 w-5 h-5 grid place-items-center text-xs rounded-full bg-black/70 ${fav.includes(c.id) ? 'text-[var(--gold)]' : 'text-white/80'}`}>★</button>
             </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkinPickerModal({ skins, current, champKey, onClose, onPick }: { skins: { id: number; name: string; base: boolean }[]; current: number; champKey: string; onClose: () => void; onPick: (id: number) => void }) {
+  return (
+    <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
+      <div className="panel w-full p-4 max-h-[80dvh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-2"><h2 className="panel-title">스킨 · 소유</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
+        <div className="grid grid-cols-2 gap-2 overflow-y-auto">
+          {skins.map((sk) => (
+            <button key={sk.id} onClick={() => onPick(sk.id)}
+              className={`relative rounded overflow-hidden ring-2 ${sk.id === current ? 'ring-[var(--gold)]' : 'ring-transparent'}`}>
+              <img src={skinArt(champKey, sk.id % 1000)} alt={sk.name} className="w-full aspect-[16/9] object-cover object-top" loading="lazy" />
+              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[11px] py-0.5 truncate px-1">{sk.name}</span>
+            </button>
           ))}
         </div>
       </div>

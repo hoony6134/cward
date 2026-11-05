@@ -54,7 +54,7 @@ export function shapeLobby(lobby, queues = []) {
   const lm = lobby?.localMember ?? {};
   // Swiftplay/Quickplay pre-pick champion+spell slots (empty for other modes).
   const slots = (lm.playerSlots ?? []).map((s) => ({
-    championId: s.championId || 0, spell1: s.spell1 || 0, spell2: s.spell2 || 0, position: s.positionPreference || '',
+    championId: s.championId || 0, spell1: s.spell1 || 0, spell2: s.spell2 || 0, position: s.positionPreference || '', skinId: s.skinId || 0,
   }));
   return {
     kind: 'lobby',

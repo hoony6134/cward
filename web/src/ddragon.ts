@@ -19,6 +19,10 @@ export const itemIcon = (id: number) =>
 export const profileIcon = (id: number) =>
   `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${id}.png`;
 
+// Skin loading art (versionless path). skinNum = skinId - championId*1000.
+export const skinArt = (champKey: string, skinNum: number) =>
+  `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${champKey}_${skinNum}.jpg`;
+
 // Official Riot lane/position icons (CommunityDragon mirror).
 export const positionIcon = (pos: string) =>
   `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-${(pos || 'fill').toLowerCase()}.png`;

@@ -30,7 +30,12 @@ export type Snapshot = {
   canPickPosition?: boolean; positions?: { first: string; second: string };
   quickPlay?: boolean;
   mapId?: number;
-  slots?: { championId: number; spell1: number; spell2: number; position: string }[];
+  owned?: number[]; // owned champion ids
+  slots?: {
+    championId: number; spell1: number; spell2: number; position: string; skinId: number;
+    skins?: { id: number; name: string; base: boolean }[];
+    recSets?: { keyIcon: string; perkIds: number[]; perkStyle: number; perkSubStyle: number; spells: number[] }[];
+  }[];
   members?: { name: string; leader: boolean; ready: boolean; first: string; second: string }[];
   // searching
   queueTime?: number; estTime?: number;

@@ -404,7 +404,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
 
       <button onClick={() => send({ cmd: 'startQueue' })} className="btn btn-blue w-full py-3 font-bold text-lg font-hud tracking-wide">대전 찾기</button>
 
-      {pick && <ChampPickerModal lane={snap.slots?.[pick.slot]?.position || ''} onClose={() => setPick(null)}
+      {pick && <ChampPickerModal lane={snap.slots?.[pick.slot]?.position || ''} recPos={snap.recPos} onClose={() => setPick(null)}
         onPick={(championId) => { send({ cmd: 'setSlotChampion', index: pick.slot, championId }); setPick(null); }} />}
       {spellPick && snap.slots?.[spellPick.slot] && (
         <SpellPickerModal current={[snap.slots[spellPick.slot].spell1, snap.slots[spellPick.slot].spell2]} onClose={() => setSpellPick(null)}
@@ -523,12 +523,14 @@ const favKey = (pos: string) => `ward:fav:${pos || 'ANY'}`;
 function getFav(pos: string): number[] { try { return JSON.parse(localStorage.getItem(favKey(pos)) || '[]'); } catch { return []; } }
 function setFav(pos: string, ids: number[]) { try { localStorage.setItem(favKey(pos), JSON.stringify(ids)); } catch { /* ignore */ } }
 
-// Full-roster picker (for Swiftplay slots): all champions + per-lane favorites.
-function ChampPickerModal({ lane, onClose, onPick }: { lane: string; onClose: () => void; onPick: (id: number) => void }) {
+// Full-roster picker (for Swiftplay slots): all champions + per-lane favorites + Riot's lane recommendations.
+function ChampPickerModal({ lane, recPos, onClose, onPick }: { lane: string; recPos?: Record<string, string[]>; onClose: () => void; onPick: (id: number) => void }) {
   const [fav, setFavState] = useState(() => getFav(lane));
   const [q, setQ] = useState('');
+  const [recOnly, setRecOnly] = useState(false);
   const all = allChampions();
-  const list = all.filter((c) => !q || c.name.includes(q));
+  const rec = (id: number) => recPos?.[String(id)]?.includes(lane);
+  const list = all.filter((c) => (!q || c.name.includes(q)) && (!recOnly || !lane || rec(c.id)));
   const toggle = (id: number) => { const n = fav.includes(id) ? fav.filter((x) => x !== id) : [...fav, id]; setFav(lane, n); setFavState(n); };
   return (
     <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
@@ -547,6 +549,12 @@ function ChampPickerModal({ lane, onClose, onPick }: { lane: string; onClose: ()
         )}
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="챔피언 검색"
           className="w-full mb-2 px-3 py-2 rounded bg-[#0a1420] text-sm outline-none ring-1 ring-[var(--gold-dim)]" />
+        {recPos && lane && (
+          <label className="flex items-center gap-2 mb-2 text-sm">
+            <Toggle on={recOnly} onChange={setRecOnly} />
+            <span>{posKo(lane)} 추천 챔피언만 <span className="text-[var(--muted)] text-xs">(Riot 제공)</span></span>
+          </label>
+        )}
         <div className="grid grid-cols-5 gap-1.5 overflow-y-auto">
           {list.map((c) => (
             <div key={c.id} className="relative">

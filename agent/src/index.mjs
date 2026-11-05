@@ -19,6 +19,7 @@ let lcu = null;          // {port, token}
 let lastAction = null;   // current champ-select action id for pick/ban commands
 let lastKind = '';
 let queues = [];         // available matchmade queues, fetched once per client session
+let recPos = null;       // {championId: ["MIDDLE",...]} Riot's recommended lanes
 let me = null;           // {name, tag, iconId, level}, fetched once per client session
 let autoAccept = true;   // toggled from the phone
 
@@ -54,12 +55,13 @@ async function tick() {
         ]);
         const snap = shapeChampSelect(session, pickable, bannable);
         lastAction = snap.myAction?.id ?? null;
+        await ensureRecPos();
         logKind('champ-select');
-        relay.send({ ...snap, me });
+        relay.send({ ...snap, me, recPos });
       } else if (phase === 'Lobby') {
-        await ensureQueues();
+        await ensureQueues(); await ensureRecPos();
         logKind('lobby');
-        relay.send({ ...shapeLobby(await lcuGet(lcu, '/lol-lobby/v2/lobby'), queues), me, autoAccept });
+        relay.send({ ...shapeLobby(await lcuGet(lcu, '/lol-lobby/v2/lobby'), queues), me, autoAccept, recPos });
       } else if (phase === 'Matchmaking') {
         const s = await lcuGet(lcu, '/lol-matchmaking/v1/search').catch(() => ({}));
         logKind('searching');
@@ -76,7 +78,7 @@ async function tick() {
       }
       return schedule(idleMs);
     } catch {
-      lcu = null; queues = []; me = null; // client closed or token rotated; rediscover next tick
+      lcu = null; queues = []; me = null; recPos = null; // client closed or token rotated; rediscover next tick
     }
   }
   logKind('off');
@@ -94,6 +96,13 @@ async function ensureQueues() {
   const mapIcon = {};
   for (const m of maps) mapIcon[m.id] ??= cdragonAsset(m.assets?.['game-select-icon-default']);
   queues = filterQueues(raw).map((q) => ({ id: q.id, name: q.name, ai: q.ai, cat: q.cat, icon: mapIcon[q.mapId] || '' }));
+}
+
+// Riot's recommended lanes per champion: { championId: ["MIDDLE", ...] }.
+async function ensureRecPos() {
+  if (recPos) return;
+  const r = await lcuGet(lcu, '/lol-perks/v1/recommended-champion-positions').catch(() => ({}));
+  recPos = Object.fromEntries(Object.entries(r).map(([id, v]) => [id, v.recommendedPositions || []]));
 }
 
 let timer = null;

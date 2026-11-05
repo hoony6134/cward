@@ -13,6 +13,7 @@ export type Snapshot = {
   t: number; phase: string | null;
   me?: { name: string; tag: string; iconId: number; level: number };
   autoAccept?: boolean;
+  recPos?: Record<string, string[]>; // championId -> Riot recommended lanes
   // in-game
   game?: { mode: string; mapId: number | null; time: number };
   active?: null | {

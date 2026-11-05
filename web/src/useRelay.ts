@@ -33,6 +33,7 @@ export type Snapshot = {
   owned?: number[]; // owned champion ids
   slots?: {
     championId: number; spell1: number; spell2: number; position: string; skinId: number;
+    perks?: { perkIds: number[]; perkStyle: number; perkSubStyle: number } | null;
     skins?: { id: number; name: string; base: boolean }[];
     recSets?: { keyIcon: string; perkIds: number[]; perkStyle: number; perkSubStyle: number; spells: number[] }[];
   }[];

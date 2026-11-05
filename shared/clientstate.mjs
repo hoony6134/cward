@@ -53,9 +53,11 @@ export function shapeLobby(lobby, queues = []) {
   const gc = lobby?.gameConfig ?? {};
   const lm = lobby?.localMember ?? {};
   // Swiftplay/Quickplay pre-pick champion+spell slots (empty for other modes).
-  const slots = (lm.playerSlots ?? []).map((s) => ({
-    championId: s.championId || 0, spell1: s.spell1 || 0, spell2: s.spell2 || 0, position: s.positionPreference || '', skinId: s.skinId || 0,
-  }));
+  const slots = (lm.playerSlots ?? []).map((s) => {
+    let perks = null;
+    try { perks = typeof s.perks === 'string' ? JSON.parse(s.perks) : s.perks; } catch { /* leave null */ }
+    return { championId: s.championId || 0, spell1: s.spell1 || 0, spell2: s.spell2 || 0, position: s.positionPreference || '', skinId: s.skinId || 0, perks };
+  });
   return {
     kind: 'lobby',
     t: Date.now(),

@@ -4,6 +4,7 @@ import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, allChampions, champIcon, champIconById, champ, itemIcon,
   loadRecommended, fmtClock, eventKo, spellCd, spellIcon, sumSpellIcon, summonerSpells, loadUltCd, ultRank, profileIcon, positionIcon,
   loadItemHaste, itemHaste, withHaste, skinArt,
+  loadRunes, perk, perkIcon, runeTrees, styleIcon, shardRows, keystoneRow, runeRows,
 } from './ddragon';
 import { POSITIONS } from '../../shared/clientstate.mjs';
 
@@ -26,7 +27,7 @@ function notify(title: string, body: string) {
 export default function App() {
   const { snap, status, paired, send } = useRelay(RELAY);
   const [ready, setReady] = useState(false);
-  useEffect(() => { (async () => { await loadDDragonVersion(); await Promise.all([loadChampions(), loadSummonerSpells(), loadItemHaste()]); setReady(true); })(); }, []);
+  useEffect(() => { (async () => { await loadDDragonVersion(); await Promise.all([loadChampions(), loadSummonerSpells(), loadItemHaste(), loadRunes()]); setReady(true); })(); }, []);
 
   // Notify on queue pop (match found) even when the tab is backgrounded.
   const prev = useRef<string>();
@@ -345,6 +346,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
   const [pick, setPick] = useState<{ slot: number } | null>(null);
   const [spellPick, setSpellPick] = useState<{ slot: number } | null>(null);
   const [skinPick, setSkinPick] = useState<{ slot: number } | null>(null);
+  const [runePick, setRunePick] = useState<{ slot: number } | null>(null);
   return (
     <main className="px-3 space-y-3 mt-3">
       <ModePicker snap={snap} send={send} />
@@ -380,19 +382,26 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                       );
                     })}
                   </div>
-                  {s.recSets?.length ? (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-[var(--muted)]">추천 룬·스펠</span>
-                      {s.recSets.map((set, si) => (
-                        <button key={si} title="이 추천 세트 적용"
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-[var(--muted)]">룬</span>
+                    {/* current keystone */}
+                    {s.perks?.perkIds?.[0] ? (ready && perkIcon(s.perks.perkIds[0])
+                      ? <img src={perkIcon(s.perks.perkIds[0])} title="현재 룬" className="w-6 h-6 rounded-full bg-[#0a1420] ring-1 ring-[var(--gold)]" />
+                      : <span className="skeleton w-6 h-6 rounded-full" />) : null}
+                    {/* recommended sets, matching one highlighted */}
+                    {s.recSets?.map((set, si) => {
+                      const on = sameRunes(s.perks, set);
+                      return (
+                        <button key={si} title={on ? '현재 선택된 추천 세트' : '이 추천 세트 적용'}
                           onClick={() => send({ cmd: 'applyRecommendedSet', index: i, perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle, spell1: set.spells[0], spell2: set.spells[1] })}
-                          className="flex items-center gap-0.5 btn btn-ghost px-1.5 py-1">
-                          {set.keyIcon && <img src={set.keyIcon} className="w-5 h-5" />}
+                          className={`flex items-center gap-0.5 px-1.5 py-1 rounded ${on ? 'bg-[var(--gold)]/20 ring-2 ring-[var(--gold)]' : 'btn btn-ghost'}`}>
+                          {set.keyIcon ? <img src={set.keyIcon} className="w-5 h-5" /> : <span className="skeleton w-5 h-5 rounded-full" />}
                           {ready && set.spells.map((sp, j) => sp ? <img key={j} src={sumSpellIcon(sp)} className="w-3.5 h-3.5 rounded-sm" /> : null)}
                         </button>
-                      ))}
-                    </div>
-                  ) : null}
+                      );
+                    })}
+                    <button onClick={() => setRunePick({ slot: i })} className="btn btn-ghost text-xs px-2 py-1">상세</button>
+                  </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {s.skins?.length ? (
                       <button onClick={() => setSkinPick({ slot: i })} className="btn btn-ghost text-xs px-2 py-1">
@@ -441,6 +450,10 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
         <SkinPickerModal skins={snap.slots[skinPick.slot].skins || []} current={snap.slots[skinPick.slot].skinId}
           champKey={champ(snap.slots[skinPick.slot].championId)?.key || ''} onClose={() => setSkinPick(null)}
           onPick={(skinId) => { send({ cmd: 'setSlotSkin', index: skinPick.slot, skinId }); setSkinPick(null); }} />
+      )}
+      {runePick && snap.slots?.[runePick.slot] && (
+        <RuneEditorModal current={snap.slots[runePick.slot].perks ?? null} onClose={() => setRunePick(null)}
+          onApply={(perkIds, perkStyle, perkSubStyle) => { send({ cmd: 'setSlotPerks', index: runePick.slot, perkIds, perkStyle, perkSubStyle }); setRunePick(null); }} />
       )}
     </main>
   );
@@ -614,6 +627,100 @@ function ChampPickerModal({ lane, recPos, owned, onClose, onPick }: { lane: stri
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+type Perks = { perkIds: number[]; perkStyle: number; perkSubStyle: number };
+function sameRunes(a: Perks | null | undefined, b: { perkIds: number[]; perkStyle: number; perkSubStyle: number }) {
+  if (!a) return false;
+  return a.perkStyle === b.perkStyle && a.perkSubStyle === b.perkSubStyle && a.perkIds.length === b.perkIds.length && a.perkIds.every((v, i) => v === b.perkIds[i]);
+}
+
+// Full rune page editor: primary tree + keystone + 3 runes, secondary tree + 2 runes, 3 stat shards.
+function RuneEditorModal({ current, onClose, onApply }: { current: Perks | null; onClose: () => void; onApply: (perkIds: number[], pri: number, sec: number) => void }) {
+  const trees = runeTrees();
+  const [pri, setPri] = useState(current?.perkStyle || 8000);
+  const [sec, setSec] = useState(current?.perkSubStyle || 8100);
+  const [keystone, setKeystone] = useState(0);
+  const [prim, setPrim] = useState<Record<number, number>>({});   // row -> perkId
+  const [second, setSecond] = useState<Record<number, number>>({}); // row -> perkId (max 2 rows)
+  const [shards, setShards] = useState<Record<number, number>>({});
+
+  // Initialise selections from the current page once rune data is available.
+  useEffect(() => {
+    if (!trees.length || !current?.perkIds) return;
+    const [ks, ...rest] = current.perkIds;
+    setKeystone(ks);
+    const pr: Record<number, number> = {}; runeRows(current.perkStyle).forEach((row, r) => { const hit = rest.find((id) => row.includes(id)); if (hit) pr[r] = hit; });
+    setPrim(pr);
+    const sc: Record<number, number> = {}; runeRows(current.perkSubStyle).forEach((row, r) => { const hit = rest.find((id) => row.includes(id)); if (hit) sc[r] = hit; });
+    setSecond(sc);
+    const sh: Record<number, number> = {}; shardRows().forEach((row, r) => { const hit = current.perkIds.find((id) => row.includes(id)); if (hit) sh[r] = hit; });
+    setShards(sh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trees.length]);
+
+  const pickSecond = (r: number, id: number) => setSecond((p) => {
+    const n = { ...p }; if (n[r] === id) { delete n[r]; return n; }
+    n[r] = id; const rows = Object.keys(n); if (rows.length > 2) delete n[Number(rows[0])]; return n;
+  });
+  const chooseTree = (id: number, primary: boolean) => {
+    if (primary) { setPri(id); setKeystone(0); setPrim({}); if (sec === id) setSec(0); }
+    else { setSec(id); setSecond({}); }
+  };
+
+  const valid = keystone && Object.keys(prim).length === 3 && Object.keys(second).length === 2 && Object.keys(shards).length === 3 && pri && sec && pri !== sec;
+  const apply = () => {
+    const perkIds = [keystone, ...[0, 1, 2].map((r) => prim[r]),
+      ...Object.keys(second).sort().map((r) => second[Number(r)]),
+      ...[0, 1, 2].map((r) => shards[r])];
+    onApply(perkIds, pri, sec);
+  };
+
+  const RuneBtn = ({ id, on, onClick, sz = 'w-9 h-9' }: { id: number; on: boolean; onClick: () => void; sz?: string }) =>
+    perkIcon(id)
+      ? <button onClick={onClick} title={perk(id)?.name} className={`${sz} rounded-full p-0.5 ${on ? 'bg-[var(--gold)]/25 ring-2 ring-[var(--gold)]' : 'ring-1 ring-[var(--gold-dim)]'}`}><img src={perkIcon(id)} className="w-full h-full" /></button>
+      : <span className={`${sz} rounded-full skeleton`} />;
+
+  return (
+    <div className="fixed inset-0 z-20 bg-black/80 flex items-end" onClick={onClose}>
+      <div className="panel w-full p-4 max-h-[88dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3"><h2 className="panel-title">룬 상세 편집</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
+        {!trees.length ? (
+          <div className="space-y-3">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-12" />)}</div>
+        ) : (
+          <div className="space-y-4">
+            {/* trees */}
+            <div className="flex items-center gap-2">
+              {trees.map((t) => <button key={t.id} onClick={() => chooseTree(t.id, true)} className={`w-9 h-9 rounded-full p-1 ${pri === t.id ? 'bg-[var(--gold)]/25 ring-2 ring-[var(--gold)]' : 'ring-1 ring-[var(--gold-dim)]'}`}><img src={styleIcon(t.id)} className="w-full h-full" /></button>)}
+              <span className="text-xs text-[var(--muted)] ml-1">주 룬</span>
+            </div>
+            {/* keystone */}
+            <div className="flex gap-2">{keystoneRow(pri).map((id) => <RuneBtn key={id} id={id} on={keystone === id} onClick={() => setKeystone(id)} sz="w-11 h-11" />)}</div>
+            {/* primary rows */}
+            {runeRows(pri).map((row, r) => (
+              <div key={r} className="flex gap-2">{row.map((id) => <RuneBtn key={id} id={id} on={prim[r] === id} onClick={() => setPrim((p) => ({ ...p, [r]: id }))} />)}</div>
+            ))}
+            {/* secondary trees */}
+            <div className="flex items-center gap-2 pt-2 border-t hair">
+              {trees.filter((t) => t.id !== pri).map((t) => <button key={t.id} onClick={() => chooseTree(t.id, false)} className={`w-8 h-8 rounded-full p-1 ${sec === t.id ? 'bg-[var(--gold)]/25 ring-2 ring-[var(--gold)]' : 'ring-1 ring-[var(--gold-dim)]'}`}><img src={styleIcon(t.id)} className="w-full h-full" /></button>)}
+              <span className="text-xs text-[var(--muted)] ml-1">보조 (2개)</span>
+            </div>
+            {runeRows(sec).map((row, r) => (
+              <div key={r} className="flex gap-2">{row.map((id) => <RuneBtn key={id} id={id} on={second[r] === id} onClick={() => pickSecond(r, id)} sz="w-8 h-8" />)}</div>
+            ))}
+            {/* shards */}
+            <div className="pt-2 border-t hair space-y-2">
+              <span className="text-xs text-[var(--muted)]">능력치 파편</span>
+              {shardRows().map((row, r) => (
+                <div key={r} className="flex gap-2">{row.map((id) => <RuneBtn key={id} id={id} on={shards[r] === id} onClick={() => setShards((p) => ({ ...p, [r]: id }))} sz="w-7 h-7" />)}</div>
+              ))}
+            </div>
+            <button disabled={!valid} onClick={apply} className="btn btn-blue w-full py-3 font-bold font-hud disabled:opacity-40">적용</button>
+          </div>
+        )}
       </div>
     </div>
   );

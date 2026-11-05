@@ -200,6 +200,12 @@ async function runCommand({ cmd, ...a }) {
       if (a.spell1 && a.spell2) { slot.spell1 = a.spell1; slot.spell2 = a.spell2; }
       return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
     }
+    case 'setSlotPerks': { // Swiftplay: apply a fully custom rune page
+      const slots = (await lcuGet(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots')).map((s) => ({ ...s }));
+      if (!slots[a.index]) return console.log('[cmd] no slot', a.index);
+      slots[a.index].perks = JSON.stringify({ perkIds: a.perkIds, perkStyle: a.perkStyle, perkSubStyle: a.perkSubStyle });
+      return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
+    }
     case 'pick':
     case 'ban':
       if (lastAction == null) return console.log('[cmd] no active action');

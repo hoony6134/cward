@@ -89,6 +89,35 @@ export async function loadUltCd(champKey: string): Promise<number[]> {
 // R rank from champion level: 6-10 -> 1, 11-15 -> 2, 16+ -> 3.
 export const ultRank = (level: number) => (level >= 16 ? 3 : level >= 11 ? 2 : 1);
 
+// Rune data (CommunityDragon): perk id -> {name, icon}, and the tree structure for the editor.
+const CD = 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default';
+const cdragon = (p?: string) => (p ? `${CD}${p.toLowerCase().replace('/lol-game-data/assets', '')}` : '');
+type Slot = { type: string; perks: number[] };
+type Style = { id: number; name: string; iconPath: string; slots: Slot[] };
+let perkById: Record<number, { name: string; icon: string }> = {};
+let styles: Style[] = [];
+const MAIN = [8000, 8100, 8200, 8300, 8400];
+export async function loadRunes(): Promise<void> {
+  try {
+    const [perks, ps] = await Promise.all([
+      fetch(`${CD}/v1/perks.json`).then((r) => r.json()),
+      fetch(`${CD}/v1/perkstyles.json`).then((r) => r.json()),
+    ]) as [{ id: number; name: string; iconPath: string }[], { styles: Style[] }];
+    perkById = Object.fromEntries(perks.map((p) => [p.id, { name: p.name, icon: cdragon(p.iconPath) }]));
+    styles = ps.styles;
+  } catch { /* keep empty */ }
+}
+export const perk = (id: number) => perkById[id];
+export const perkIcon = (id: number) => perkById[id]?.icon || '';
+export const runeTrees = () => styles.filter((s) => MAIN.includes(s.id));
+export const styleById = (id: number) => styles.find((s) => s.id === id);
+export const styleIcon = (id: number) => cdragon(styleById(id)?.iconPath);
+// The 3 universal stat-shard rows (offense / flex / defense).
+export const shardRows = () => (runeTrees()[0]?.slots.filter((s) => s.type === 'kStatMod').map((s) => s.perks) ?? []);
+// Primary: keystone row + 3 rune rows. Secondary: the same 3 rune rows (pick 2).
+export const keystoneRow = (styleId: number) => styleById(styleId)?.slots.find((s) => s.type === 'kKeyStone')?.perks ?? [];
+export const runeRows = (styleId: number) => styleById(styleId)?.slots.filter((s) => s.type === 'kMixedRegularSplashable').map((s) => s.perks) ?? [];
+
 // Ability Haste per item, parsed from ddragon descriptions (auto-updates per patch).
 let itemAHById: Record<number, number> = {};
 export async function loadItemHaste(): Promise<void> {

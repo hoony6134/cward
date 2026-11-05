@@ -147,6 +147,18 @@ async function runCommand({ cmd, ...a }) {
       slots[a.index].positionPreference = a.position;
       return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
     }
+    case 'applyRecommended': { // Swiftplay: apply Riot's recommended runes (+spells) to a slot
+      const mapId = (await lcuGet(lcu, '/lol-lobby/v2/lobby')).gameConfig?.mapId ?? 11;
+      const slots = (await lcuGet(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots')).map((s) => ({ ...s }));
+      const slot = slots[a.index];
+      if (!slot) return console.log('[cmd] no slot', a.index);
+      const pages = await lcuGet(lcu, `/lol-perks/v1/recommended-pages/champion/${slot.championId}/position/${slot.positionPreference}/map/${mapId}`).catch(() => []);
+      const pg = pages[0];
+      if (!pg) return console.log('[cmd] no recommendation');
+      slot.perks = JSON.stringify({ perkIds: pg.perks.map((x) => x.id), perkStyle: pg.primaryPerkStyleId, perkSubStyle: pg.secondaryPerkStyleId });
+      if (pg.summonerSpellIds?.length === 2) { slot.spell1 = pg.summonerSpellIds[0]; slot.spell2 = pg.summonerSpellIds[1]; }
+      return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
+    }
     case 'pick':
     case 'ban':
       if (lastAction == null) return console.log('[cmd] no active action');

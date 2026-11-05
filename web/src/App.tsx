@@ -374,6 +374,10 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                       );
                     })}
                   </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={() => send({ cmd: 'applyRecommended', index: i })} className="btn btn-ghost text-xs px-2 py-1">추천 룬·스펠</button>
+                    <SlotItemReco champId={s.championId} mapId={snap.mapId ?? 11} ready={ready} />
+                  </div>
                 </div>
               </li>
             ))}
@@ -419,6 +423,20 @@ function Toggle({ on, onChange, className = '' }: { on: boolean; onChange: (v: b
     <button onClick={() => onChange(!on)} className={`w-11 h-6 rounded-full p-0.5 transition-colors ${on ? 'bg-[var(--blue)]' : 'bg-[#122235] ring-1 ring-[var(--gold-dim)]'} ${className}`}>
       <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${on ? 'translate-x-5' : ''}`} />
     </button>
+  );
+}
+
+// Riot's recommended items for a slot's champion (compact strip).
+function SlotItemReco({ champId, mapId, ready }: { champId: number; mapId: number; ready: boolean }) {
+  const [items, setItems] = useState<number[]>([]);
+  const key = champ(champId)?.key;
+  useEffect(() => { if (key) loadRecommended(key, mapId).then((ids) => setItems(ids.slice(0, 6))); }, [key, mapId]);
+  if (!items.length) return null;
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-[10px] text-[var(--muted)]">추천템</span>
+      {ready && items.map((id, i) => <img key={i} src={itemIcon(id)} className="w-5 h-5 rounded-sm ring-1 ring-[var(--gold-dim)]" loading="lazy" />)}
+    </div>
   );
 }
 

@@ -29,6 +29,7 @@ export type Snapshot = {
   queueId?: number | null; queueName?: string; mode?: string; maxSize?: number | null;
   canPickPosition?: boolean; positions?: { first: string; second: string };
   quickPlay?: boolean;
+  mapId?: number;
   slots?: { championId: number; spell1: number; spell2: number; position: string }[];
   members?: { name: string; leader: boolean; ready: boolean; first: string; second: string }[];
   // searching

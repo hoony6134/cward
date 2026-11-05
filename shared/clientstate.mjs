@@ -64,6 +64,7 @@ export function shapeLobby(lobby, queues = []) {
     queueId: gc.queueId ?? null,
     queueName: queueKo(gc.queueId),
     quickPlay: gc.showQuickPlaySlotSelection === true,
+    mapId: gc.mapId ?? 11,
     slots,
     mode: gc.gameMode || '',
     maxSize: gc.maxLobbySize ?? null,

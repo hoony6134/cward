@@ -603,12 +603,13 @@ function Searching({ snap, send }: { snap: Snapshot; send: (c: Command) => void 
 }
 
 function Waiting({ status, phase }: { status: string; phase?: string | null }) {
+  const off = !phase || phase === 'None';
   return (
     <div className="flex flex-col items-center justify-center text-center gap-2 mt-24 px-6">
       <div className="font-hud text-3xl text-[var(--gold)]">WARD</div>
-      <p className="text-[var(--text)] font-medium mt-2">대기 중</p>
-      <p className="text-sm text-[var(--muted)]">클라이언트에서 로비/게임을 시작하면 자동 표시돼요.</p>
-      <p className="text-xs text-[var(--muted)]/60">연결: {status}{phase ? ` · ${phase}` : ''}</p>
+      <p className="text-[var(--text)] font-medium mt-2">{off ? 'PC 클라이언트 꺼짐' : '대기 중'}</p>
+      <p className="text-sm text-[var(--muted)]">{off ? 'PC에서 롤 클라이언트를 켜면 자동으로 연결돼요.' : '클라이언트에서 로비/게임을 시작하면 자동 표시돼요.'}</p>
+      <p className="text-xs text-[var(--muted)]/60">서버 연결: {status}{off ? '' : ` · ${phase}`}</p>
     </div>
   );
 }

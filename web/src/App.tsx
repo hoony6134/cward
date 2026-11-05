@@ -3,7 +3,7 @@ import { useRelay, clearPairing, parsePairing, savePairing, type Snapshot, type 
 import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, allChampions, champIcon, champIconById, champ, itemIcon,
   loadRecommended, fmtClock, eventKo, spellCd, spellIcon, sumSpellIcon, summonerSpells, loadUltCd, ultRank, profileIcon, positionIcon,
-  loadItemHaste, itemHaste, withHaste,
+  loadItemHaste, itemHaste, withHaste, skinArt,
 } from './ddragon';
 import { POSITIONS } from '../../shared/clientstate.mjs';
 
@@ -360,11 +360,14 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                 <div className="flex-1 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-[var(--muted)]">{i === 0 ? '1번 슬롯' : '2번 슬롯'} · 우선순위 {posKo(s.position)}</span>
-                    <button onClick={() => setSpellPick({ slot: i })} className="flex gap-0.5 ml-auto" title="스펠 변경">
-                      {[s.spell1, s.spell2].map((sp, j) => ready && sp
-                        ? <img key={j} src={sumSpellIcon(sp)} className="w-6 h-6 rounded ring-1 ring-[var(--gold-dim)]" />
-                        : <span key={j} className="w-6 h-6 rounded bg-[#122235]" />)}
-                    </button>
+                    <div className="flex items-center gap-1 ml-auto">
+                      <button onClick={() => send({ cmd: 'setSlotSpells', index: i, spell1: s.spell2, spell2: s.spell1 })} title="D/F 교환" className="btn btn-ghost px-1.5 py-1 text-xs">⇄</button>
+                      <button onClick={() => setSpellPick({ slot: i })} className="flex gap-0.5" title="스펠 변경">
+                        {[s.spell1, s.spell2].map((sp, j) => ready && sp
+                          ? <img key={j} src={sumSpellIcon(sp)} className="w-6 h-6 rounded ring-1 ring-[var(--gold-dim)]" />
+                          : <span key={j} className="w-6 h-6 rounded bg-[#122235]" />)}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex gap-1.5">
                     {POSITIONS.map((pos: string) => {

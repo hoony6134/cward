@@ -58,7 +58,14 @@ async function tick() {
         const snap = shapeChampSelect(session, pickable, bannable);
         lastAction = snap.myAction?.id ?? null;
         await ensureRecPos();
-        if (snap.mine?.championId) snap.mine.skins = await ensureSkins(snap.mine.championId);
+        if (snap.mine?.championId) {
+          const pos = snap.myTeam?.find((c) => c.me)?.position || recPos?.[snap.mine.championId]?.[0] || '';
+          const mapId = (await lcuGet(lcu, '/lol-gameflow/v1/session').catch(() => null))?.map?.id || 11;
+          snap.mine.skins = await ensureSkins(snap.mine.championId);
+          snap.mine.recSets = await ensureRecSets(snap.mine.championId, pos, mapId);
+          const cur = await lcuGet(lcu, '/lol-perks/v1/currentpage').catch(() => null);
+          if (cur) snap.mine.perks = { perkIds: cur.selectedPerkIds || [], perkStyle: cur.primaryStyleId, perkSubStyle: cur.subStyleId };
+        }
         logKind('champ-select');
         relay.send({ ...snap, me, recPos, owned: await ensureOwned() });
       } else if (phase === 'Lobby') {
@@ -277,6 +284,12 @@ async function runCommand({ cmd, ...a }) {
       if (a.spell1) body.spell1Id = a.spell1;
       if (a.spell2) body.spell2Id = a.spell2;
       return void (await lcuPatch(lcu, '/lol-champ-select/v1/session/my-selection', body));
+    }
+    case 'applyRunePage': { // champ-select: write runes into the current rune page
+      const cur = await lcuGet(lcu, '/lol-perks/v1/currentpage').catch(() => null);
+      const page = { name: cur?.name || 'Ward', primaryStyleId: a.perkStyle, subStyleId: a.perkSubStyle, selectedPerkIds: a.perkIds, current: true };
+      if (cur?.id && cur.isEditable) return void (await lcuPut(lcu, `/lol-perks/v1/pages/${cur.id}`, { ...page, id: cur.id, order: cur.order }));
+      return void (await lcuPost(lcu, '/lol-perks/v1/pages', page)); // shortcut: current page locked → add one (may hit page cap); upgrade: delete an editable page first
     }
     case 'pick':
     case 'ban':

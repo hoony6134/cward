@@ -58,7 +58,7 @@ export type Snapshot = {
   pickable?: number[]; bannable?: number[];
   benchEnabled?: boolean; bench?: number[]; rerolls?: number;
   trades?: { id: number; cellId: number; state: string }[];
-  mine?: { championId: number; skinId: number; spell1: number; spell2: number; skins?: { id: number; name: string; base?: boolean; chroma?: boolean; color?: string }[] } | null;
+  mine?: { championId: number; skinId: number; spell1: number; spell2: number; skins?: { id: number; name: string; base?: boolean; chroma?: boolean; color?: string }[]; perks?: { perkIds: number[]; perkStyle: number; perkSubStyle: number } | null; recSets?: { keyIcon: string; perkIds: number[]; perkStyle: number; perkSubStyle: number; spells: number[] }[] } | null;
 };
 export type Command = Record<string, unknown> & { cmd: string };
 

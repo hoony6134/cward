@@ -633,6 +633,7 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
   const [sel, setSel] = useState(0);
   const [spellPick, setSpellPick] = useState(false);
   const [skinPick, setSkinPick] = useState(false);
+  const [runePick, setRunePick] = useState(false);
   const mine = snap.mine;
   const incoming = (snap.trades ?? []).filter((t) => t.state === 'RECEIVED');
   return (
@@ -679,9 +680,9 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
         </Panel>
       )}
 
-      {/* my skin + spells */}
+      {/* my runes + skin + spells */}
       {mine?.championId ? (
-        <Panel title="내 스킨 · 스펠">
+        <Panel title="내 룬 · 스킨 · 스펠">
           <div className="flex items-center gap-3">
             <button onClick={() => setSkinPick(true)} disabled={!mine.skins?.length}>
               <ChampImg id={mine.championId} className="w-12 h-12 rounded ring-1 ring-[var(--gold-dim)]" />
@@ -690,6 +691,25 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
             <button onClick={() => setSpellPick(true)} className="flex gap-1">
               {[mine.spell1, mine.spell2].map((sp, j) => ready && sp ? <img key={j} src={sumSpellIcon(sp)} className="w-7 h-7 rounded ring-1 ring-[var(--gold-dim)]" /> : <span key={j} className="w-7 h-7 rounded bg-[#122235]" />)}
             </button>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+            {/* current keystone — tap to open detailed rune editor */}
+            <button onClick={() => setRunePick(true)} title="룬 편집">
+              {mine.perks?.perkIds?.[0] && ready && perkIcon(mine.perks.perkIds[0])
+                ? <img src={perkIcon(mine.perks.perkIds[0])} className="w-7 h-7 rounded-full bg-[#0a1420] ring-1 ring-[var(--gold)]" />
+                : <span className="w-7 h-7 rounded-full bg-[#122235] ring-1 ring-[var(--gold-dim)] grid place-items-center text-[10px] text-[var(--muted)]">룬</span>}
+            </button>
+            {/* recommended sets, matching one highlighted */}
+            {mine.recSets?.map((set, si) => {
+              const on = sameRunes(mine.perks, set);
+              return (
+                <button key={si} onClick={() => { send({ cmd: 'applyRunePage', perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle }); if (set.spells[0] && set.spells[1]) send({ cmd: 'csSelect', spell1: set.spells[0], spell2: set.spells[1] }); }}
+                  className={`flex items-center gap-0.5 px-1.5 py-1 rounded ${on ? 'bg-[var(--gold)]/20 ring-2 ring-[var(--gold)]' : 'btn btn-ghost'}`}>
+                  {set.keyIcon ? <img src={set.keyIcon} className="w-5 h-5" /> : <span className="skeleton w-5 h-5 rounded-full" />}
+                  {ready && set.spells.map((sp, j) => sp ? <img key={j} src={sumSpellIcon(sp)} className="w-3.5 h-3.5 rounded-sm" /> : null)}
+                </button>
+              );
+            })}
           </div>
         </Panel>
       ) : null}
@@ -701,6 +721,8 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
         onPick={(spell1, spell2) => send({ cmd: 'csSelect', spell1, spell2 })} />}
       {skinPick && mine && <SkinPickerModal skins={mine.skins || []} current={mine.skinId} champKey={champ(mine.championId)?.key || ''}
         onClose={() => setSkinPick(false)} onPick={(skinId) => { send({ cmd: 'csSelect', skinId }); setSkinPick(false); }} />}
+      {runePick && mine && <RuneEditorModal current={mine.perks ?? null} onClose={() => setRunePick(false)}
+        onApply={(perkIds, perkStyle, perkSubStyle) => { send({ cmd: 'applyRunePage', perkIds, perkStyle, perkSubStyle }); setRunePick(false); }} />}
     </main>
   );
 }

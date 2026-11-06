@@ -480,7 +480,6 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                 </button>
                 <div className="flex-1 space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-[var(--muted)]">{i === 0 ? '1번 슬롯' : '2번 슬롯'} · 우선순위 {posKo(s.position)}</span>
                     <div className="flex items-center gap-1 ml-auto">
                       <button onClick={() => send({ cmd: 'setSlotSpells', index: i, spell1: s.spell2, spell2: s.spell1 })} title="D/F 교환" className="btn btn-ghost px-1.5 py-1 text-xs">⇄</button>
                       <button onClick={() => setSpellPick({ slot: i })} className="flex gap-0.5" >
@@ -504,10 +503,12 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                     })}
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {/* current keystone */}
-                    {s.perks?.perkIds?.[0] ? (ready && perkIcon(s.perks.perkIds[0])
-                      ? <img src={perkIcon(s.perks.perkIds[0])} className="w-6 h-6 rounded-full bg-[#0a1420] ring-1 ring-[var(--gold)]" />
-                      : <span className="skeleton w-6 h-6 rounded-full" />) : null}
+                    {/* current keystone — tap to open detailed rune editor */}
+                    <button onClick={() => setRunePick({ slot: i })} title="룬 편집">
+                      {s.perks?.perkIds?.[0] && ready && perkIcon(s.perks.perkIds[0])
+                        ? <img src={perkIcon(s.perks.perkIds[0])} className="w-7 h-7 rounded-full bg-[#0a1420] ring-1 ring-[var(--gold)]" />
+                        : <span className="w-7 h-7 rounded-full bg-[#122235] ring-1 ring-[var(--gold-dim)] grid place-items-center text-[10px] text-[var(--muted)]">룬</span>}
+                    </button>
                     {/* recommended sets, matching one highlighted */}
                     {s.recSets?.map((set, si) => {
                       const on = sameRunes(s.perks, set);
@@ -519,7 +520,6 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                         </button>
                       );
                     })}
-                    <button onClick={() => setRunePick({ slot: i })} className="btn btn-ghost text-xs px-2 py-1">상세</button>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {s.skins?.length ? (

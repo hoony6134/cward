@@ -597,7 +597,7 @@ function ChampPickerModal({ lane, recPos, owned, onClose, onPick }: { lane: stri
   const toggle = (id: number) => { const n = fav.includes(id) ? fav.filter((x) => x !== id) : [...fav, id]; setFav(lane, n); setFavState(n); };
   return (
     <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
-      <div className="panel w-full p-4 max-h-[85dvh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full p-4 h-[75dvh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2">
           <h2 className="panel-title">챔피언 선택 · {posKo(lane)}</h2>
           <button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button>
@@ -686,7 +686,7 @@ function RuneEditorModal({ current, onClose, onApply }: { current: Perks | null;
 
   return (
     <div className="fixed inset-0 z-20 bg-black/80 flex items-end" onClick={onClose}>
-      <div className="panel w-full p-4 max-h-[88dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full p-4 min-h-[70dvh] max-h-[90dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3"><h2 className="panel-title">룬 상세 편집</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
         {!trees.length ? (
           <div className="space-y-3">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-12" />)}</div>
@@ -729,7 +729,7 @@ function RuneEditorModal({ current, onClose, onApply }: { current: Perks | null;
 function SkinPickerModal({ skins, current, champKey, onClose, onPick }: { skins: { id: number; name: string; base?: boolean; chroma?: boolean; color?: string }[]; current: number; champKey: string; onClose: () => void; onPick: (id: number) => void }) {
   return (
     <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
-      <div className="panel w-full p-4 max-h-[80dvh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full p-4 min-h-[60dvh] max-h-[85dvh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2"><h2 className="panel-title">스킨 · 크로마 (소유)</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
         <div className="grid grid-cols-2 gap-2 overflow-y-auto">
           {skins.map((sk) => (
@@ -757,7 +757,7 @@ function SpellPickerModal({ current, onClose, onPick }: { current: [number, numb
   };
   return (
     <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
-      <div className="panel w-full p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="panel w-full p-4 min-h-[55dvh]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3"><h2 className="panel-title">소환사 주문</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
         <div className="flex gap-3 justify-center mb-3">
           {[0, 1].map((i) => (

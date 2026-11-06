@@ -92,7 +92,7 @@ async function tick() {
         const b = await lcuGet(lcu, '/lol-honor-v2/v1/ballot').catch(() => null);
         const allies = (b?.eligibleAllies || b?.eligiblePlayers || []).map((p) => ({ sid: p.summonerId, puuid: p.puuid, name: p.summonerName || p.gameName || '', champId: p.championId || p.championName }));
         logKind('postgame');
-        relay.send({ kind: 'postgame', t: Date.now(), phase, me, ballot: b ? { gameId: b.gameId, allies } : null });
+        relay.send({ kind: 'postgame', t: Date.now(), phase, me, honorVotes: b?.votePool?.votes ?? 0, ballot: b ? { gameId: b.gameId, allies } : null });
       } else {
         // Client open at the main menu (None) or other non-lobby state: offer mode select.
         await ensureQueues();
@@ -231,6 +231,8 @@ async function runCommand({ cmd, ...a }) {
       return;
     }
     case 'chatSend':      return void (await lcuPost(lcu, `/lol-chat/v1/conversations/${encodeURIComponent(a.to)}/messages`, { body: a.text, type: 'chat' }));
+    case 'continueEog':   return void (await lcuPost(lcu, '/lol-end-of-game/v1/state/dismiss-stats'));
+    case 'playAgain':     return void (await lcuPost(lcu, '/lol-lobby/v2/play-again'));
     case 'startQueue':    return void (await lcuPost(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
     case 'stopQueue':     return void (await lcuDelete(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
     case 'acceptReady':   return void (await lcuPost(lcu, '/lol-matchmaking/v1/ready-check/accept'));

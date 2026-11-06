@@ -11,6 +11,7 @@ export type Cell = { cellId: number; championId: number; position: string; me: b
 export type Snapshot = {
   kind?: 'ingame' | 'lobby' | 'champselect' | 'readycheck' | 'searching' | 'menu' | 'postgame' | 'off' | 'client' | 'idle';
   ballot?: { gameId: number; allies: { sid: number; puuid: string; name: string; champId: number }[] } | null;
+  honorVotes?: number;
   t: number; phase: string | null;
   me?: {
     name: string; tag: string; iconId: number; level: number;

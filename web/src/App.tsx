@@ -989,24 +989,34 @@ function ReadyCheck({ send }: { send: (c: Command) => void }) {
 }
 
 function PostGame({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c: Command) => void }) {
-  const [honored, setHonored] = useState(false);
+  const [honored, setHonored] = useState<number[]>([]); // sids already honored this game
   const allies = snap.ballot?.allies ?? [];
+  const votes = snap.honorVotes ?? 0;
+  const left = Math.max(0, votes - honored.length);
   return (
     <main className="px-3 space-y-3 mt-3">
-      <Panel title="명예 평가">
+      <Panel title={votes ? `명예 평가 · 남은 명예 ${left}/${votes}` : '명예 평가'}>
         {allies.length ? (
           <ul className="space-y-2">
-            {allies.map((p) => (
-              <li key={p.sid || p.puuid} className="flex items-center gap-2">
-                {ready && p.champId ? <ChampImg id={p.champId} className="w-8 h-8 rounded" /> : <span className="w-8 h-8 rounded bg-[#122235] block" />}
-                <span className="flex-1 truncate text-sm">{p.name || '소환사'}</span>
-                <button disabled={honored} onClick={() => { send({ cmd: 'honor', sid: p.sid, puuid: p.puuid }); setHonored(true); }}
-                  className="btn btn-gold text-xs px-3 py-1 disabled:opacity-40">{honored ? '완료' : '명예'}</button>
-              </li>
-            ))}
+            {allies.map((p) => {
+              const done = honored.includes(p.sid);
+              return (
+                <li key={p.sid || p.puuid} className="flex items-center gap-2">
+                  {ready && p.champId ? <ChampImg id={p.champId} className="w-8 h-8 rounded" /> : <span className="w-8 h-8 rounded bg-[#122235] block" />}
+                  <span className="flex-1 truncate text-sm">{p.name || '소환사'}</span>
+                  <button disabled={done || (!!votes && left <= 0)} onClick={() => { send({ cmd: 'honor', sid: p.sid, puuid: p.puuid }); setHonored((h) => [...h, p.sid]); }}
+                    className="btn btn-gold text-xs px-3 py-1 disabled:opacity-40">{done ? '완료' : '명예'}</button>
+                </li>
+              );
+            })}
           </ul>
         ) : <p className="text-sm text-[var(--muted)]">명예 평가 대상이 없어요.</p>}
       </Panel>
+
+      <div className="flex gap-2">
+        <button onClick={() => send({ cmd: 'continueEog' })} className="btn btn-ghost flex-1 py-3 font-hud">계속</button>
+        <button onClick={() => send({ cmd: 'playAgain' })} className="btn btn-blue flex-1 py-3 font-bold font-hud">한번 더 하기</button>
+      </div>
     </main>
   );
 }

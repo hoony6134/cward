@@ -726,17 +726,19 @@ function RuneEditorModal({ current, onClose, onApply }: { current: Perks | null;
   );
 }
 
-function SkinPickerModal({ skins, current, champKey, onClose, onPick }: { skins: { id: number; name: string; base: boolean }[]; current: number; champKey: string; onClose: () => void; onPick: (id: number) => void }) {
+function SkinPickerModal({ skins, current, champKey, onClose, onPick }: { skins: { id: number; name: string; base?: boolean; chroma?: boolean; color?: string }[]; current: number; champKey: string; onClose: () => void; onPick: (id: number) => void }) {
   return (
     <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
       <div className="panel w-full p-4 max-h-[80dvh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-2"><h2 className="panel-title">스킨 · 소유</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
+        <div className="flex items-center justify-between mb-2"><h2 className="panel-title">스킨 · 크로마 (소유)</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
         <div className="grid grid-cols-2 gap-2 overflow-y-auto">
           {skins.map((sk) => (
             <button key={sk.id} onClick={() => onPick(sk.id)}
               className={`relative rounded overflow-hidden ring-2 ${sk.id === current ? 'ring-[var(--gold)]' : 'ring-transparent'}`}>
-              <img src={skinArt(champKey, sk.id % 1000)} alt={sk.name} className="w-full aspect-[16/9] object-cover object-top" loading="lazy" />
-              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[11px] py-0.5 truncate px-1">{sk.name}</span>
+              {sk.chroma
+                ? <div className="w-full aspect-[16/9] flex items-center justify-center" style={{ background: sk.color }}><span className="w-6 h-6 rounded-full ring-2 ring-white/70" style={{ background: sk.color }} /></div>
+                : <img src={skinArt(champKey, sk.id % 1000)} alt={sk.name} className="w-full aspect-[16/9] object-cover object-top" loading="lazy" />}
+              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[11px] py-0.5 truncate px-1">{sk.chroma ? `└ ${sk.name}` : sk.name}</span>
             </button>
           ))}
         </div>

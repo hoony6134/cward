@@ -34,7 +34,7 @@ export type Snapshot = {
   slots?: {
     championId: number; spell1: number; spell2: number; position: string; skinId: number;
     perks?: { perkIds: number[]; perkStyle: number; perkSubStyle: number } | null;
-    skins?: { id: number; name: string; base: boolean }[];
+    skins?: { id: number; name: string; base?: boolean; chroma?: boolean; color?: string }[];
     recSets?: { keyIcon: string; perkIds: number[]; perkStyle: number; perkSubStyle: number; spells: number[] }[];
   }[];
   members?: { name: string; leader: boolean; ready: boolean; first: string; second: string }[];

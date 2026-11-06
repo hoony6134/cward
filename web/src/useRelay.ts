@@ -39,8 +39,7 @@ export type Snapshot = {
   canPickPosition?: boolean; positions?: { first: string; second: string };
   quickPlay?: boolean;
   mapId?: number;
-  priorityPos?: string[]; // mandatory matchmaking priority positions (≥1)
-  scarce?: string[];      // positions that get faster queue
+  scarce?: string[];      // priority (scarce) positions — at least one slot lane must be one of these
   owned?: number[]; // owned champion ids
   slots?: {
     championId: number; spell1: number; spell2: number; position: string; skinId: number;

@@ -68,9 +68,7 @@ async function tick() {
           s.skins = await ensureSkins(s.championId);
           s.recSets = await ensureRecSets(s.championId, s.position, lob.mapId);
         }
-        // 우선순위 포지션 = parties metadata.positionPref (≥1 required to queue). scarce = faster-queue hint.
-        const pp = await lcuGet(lcu, '/lol-lobby/v1/parties/player').catch(() => null);
-        lob.priorityPos = (pp?.currentParty?.players || []).find((p) => p.puuid === me?.puuid)?.metadata?.positionPref || [];
+        // "우선순위 포지션" = at least one slot lane must be a scarce role (client requirement).
         const gm = await lcuGet(lcu, '/lol-lobby/v1/parties/gamemode').catch(() => null);
         try { lob.scarce = JSON.parse(gm?.gameCustomization?.scarcePositions || '[]'); } catch { lob.scarce = []; }
         logKind('lobby');
@@ -259,13 +257,6 @@ async function runCommand({ cmd, ...a }) {
       if (!slots[a.index]) return console.log('[cmd] no slot', a.index);
       slots[a.index].skinId = a.skinId;
       return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
-    }
-    case 'setPriorityPos': { // the mandatory matchmaking priority positions (parties metadata.positionPref)
-      const sum = await lcuGet(lcu, '/lol-summoner/v1/current-summoner');
-      const pp = await lcuGet(lcu, '/lol-lobby/v1/parties/player');
-      const meP = (pp.currentParty?.players || []).find((p) => p.puuid === sum.puuid);
-      if (!meP) return console.log('[cmd] no party member');
-      return void (await lcuPut(lcu, '/lol-lobby/v1/parties/metadata', { ...meP.metadata, positionPref: a.positions }));
     }
     case 'applyRecommendedSet': { // Swiftplay: apply a chosen recommended rune+spell set
       const slots = (await lcuGet(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots')).map((s) => ({ ...s }));

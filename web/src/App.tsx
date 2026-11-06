@@ -467,9 +467,8 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
     <main className="px-3 space-y-3 mt-3">
       <ModePicker snap={snap} send={send} />
 
-      {snap.quickPlay && (
-        <PriorityPicker current={snap.priorityPos ?? []} scarce={snap.scarce ?? []} ready={ready}
-          onChange={(positions) => send({ cmd: 'setPriorityPos', positions })} />
+      {snap.quickPlay && snap.slots?.length && !snap.slots.some((s) => (snap.scarce ?? []).includes(s.position)) && (
+        <p className="panel px-4 py-2 text-sm text-[var(--red)] text-center">우선순위 포지션(◆)을 하나는 선택해야 매칭돼요</p>
       )}
 
       {snap.quickPlay && snap.slots?.length ? (
@@ -495,10 +494,12 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                   <div className="flex gap-1.5">
                     {POSITIONS.map((pos: string) => {
                       const sel = s.position === pos;
+                      const scarce = (snap.scarce ?? []).includes(pos);
                       return (
                         <button key={pos} onClick={() => send({ cmd: 'setSlotPosition', index: i, position: pos })}
-                          className={`p-1 flex-1 grid place-items-center rounded ${sel ? 'ring-2 ring-[var(--gold)] bg-[#0a1420]' : 'ring-1 ring-[var(--gold-dim)] bg-[#122235]'}`}>
+                          className={`relative p-1 flex-1 grid place-items-center rounded ${sel ? 'ring-2 ring-[var(--gold)] bg-[#0a1420]' : 'ring-1 ring-[var(--gold-dim)] bg-[#122235]'}`}>
                           {ready && <img src={positionIcon(pos)} className="w-5 h-5" />}
+                          {scarce && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rotate-45 bg-[var(--blue)]" title="우선순위(빠른 대기열)" />}
                         </button>
                       );
                     })}
@@ -595,28 +596,6 @@ function SlotItemReco({ champId, mapId, ready }: { champId: number; mapId: numbe
     <div className="flex items-center gap-1">
       {ready && items.map((id, i) => <img key={i} src={itemIcon(id)} className="w-5 h-5 rounded-sm ring-1 ring-[var(--gold-dim)]" loading="lazy" />)}
     </div>
-  );
-}
-
-// Mandatory matchmaking priority positions (≥1). Scarce roles get a faster-queue mark.
-function PriorityPicker({ current, scarce, ready, onChange }: { current: string[]; scarce: string[]; ready: boolean; onChange: (p: string[]) => void }) {
-  const toggle = (pos: string) => onChange(current.includes(pos) ? current.filter((p) => p !== pos) : [...current, pos]);
-  return (
-    <Panel title="우선순위 포지션">
-      <div className="flex gap-2">
-        {POSITIONS.map((pos: string) => {
-          const sel = current.includes(pos);
-          return (
-            <button key={pos} onClick={() => toggle(pos)}
-              className={`relative p-1.5 flex-1 grid place-items-center rounded ${sel ? 'ring-2 ring-[var(--gold)] bg-[#0a1420]' : 'ring-1 ring-[var(--gold-dim)] bg-[#122235]'}`}>
-              {ready && <img src={positionIcon(pos)} className="w-6 h-6" />}
-              {scarce.includes(pos) && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rotate-45 bg-[var(--blue)]" title="빠른 대기열" />}
-            </button>
-          );
-        })}
-      </div>
-      {!current.length && <p className="text-xs text-[var(--red)] mt-1.5">하나 이상 선택해야 매칭돼요</p>}
-    </Panel>
   );
 }
 

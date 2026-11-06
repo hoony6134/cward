@@ -56,7 +56,9 @@ export default function App() {
         {kind === 'ingame' && <span className="ml-auto font-mono text-xl tabular-nums text-[var(--gold-br)]">{fmtClock(snap!.game?.time ?? 0)}</span>}
         <NotifBell className={kind === 'ingame' ? '' : 'ml-auto'} />
         <Dot status={status} />
-        <button onClick={() => setDrawer(true)} aria-label="메뉴" className="text-[var(--gold)] text-xl leading-none px-1">☰</button>
+        <button onClick={() => setDrawer(true)} aria-label="메뉴" className="text-[var(--gold)] px-1 flex items-center">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 5h12M3 9h12M3 13h12" /></svg>
+        </button>
         </header>
       </div>
 

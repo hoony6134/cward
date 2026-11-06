@@ -154,7 +154,7 @@ async function ensureSkins(championId) {
   const skins = await lcuGet(lcu, `/lol-champions/v1/inventories/${sid}/champions/${championId}/skins`).catch(() => []);
   return (skinCache[championId] = skins.filter((s) => s.ownership?.owned).flatMap((s) => [
     { id: s.id, name: s.name, base: !!s.isBase },
-    ...(s.childSkins || []).filter((ch) => ch.ownership?.owned).map((ch) => ({ id: ch.id, name: ch.name, chroma: true, color: (ch.colors || [])[0] || '#888888' })),
+    ...(s.chromas || []).filter((ch) => ch.ownership?.owned).map((ch) => ({ id: ch.id, name: ch.name, chroma: true, color: (ch.colors || [])[0] || '#888888' })),
   ]));
 }
 

@@ -51,6 +51,9 @@ export type Snapshot = {
   myTeam?: Cell[]; theirTeam?: Cell[];
   bans?: { mine: number[]; theirs: number[] };
   pickable?: number[]; bannable?: number[];
+  benchEnabled?: boolean; bench?: number[]; rerolls?: number;
+  trades?: { id: number; cellId: number; state: string }[];
+  mine?: { championId: number; skinId: number; spell1: number; spell2: number; skins?: { id: number; name: string; base?: boolean; chroma?: boolean; color?: string }[] } | null;
 };
 export type Command = Record<string, unknown> & { cmd: string };
 

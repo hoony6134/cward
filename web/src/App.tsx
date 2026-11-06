@@ -562,14 +562,32 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
   const action = snap.myAction;
   const isBan = action?.type === 'ban';
   const [sel, setSel] = useState(0);
+  const [spellPick, setSpellPick] = useState(false);
+  const [skinPick, setSkinPick] = useState(false);
+  const mine = snap.mine;
+  const incoming = (snap.trades ?? []).filter((t) => t.state === 'RECEIVED');
   return (
     <main className="px-3 space-y-3 mt-3">
       <section className="panel flex items-center justify-between px-4 py-3">
         <span className="text-xs text-[var(--muted)]">{snap.timerPhase || '진행 중'}</span>
         <span className="font-mono text-2xl tabular-nums text-[var(--gold-br)]">{snap.timeLeft ?? 0}s</span>
       </section>
+
+      {incoming.length > 0 && (
+        <Panel title="챔피언 교환 요청">
+          {incoming.map((t) => (
+            <div key={t.id} className="flex items-center gap-2 mb-1 last:mb-0">
+              <span className="text-sm flex-1">교환 요청이 왔어요</span>
+              <button onClick={() => send({ cmd: 'tradeAccept', id: t.id })} className="btn btn-blue text-xs px-3 py-1">수락</button>
+              <button onClick={() => send({ cmd: 'tradeDecline', id: t.id })} className="btn btn-danger text-xs px-3 py-1">거절</button>
+            </div>
+          ))}
+        </Panel>
+      )}
+
       <TeamCells title="우리 팀" cells={snap.myTeam ?? []} ready={ready} />
       <Bans mine={snap.bans?.mine ?? []} theirs={snap.bans?.theirs ?? []} ready={ready} />
+
       {action ? (
         <Panel title={isBan ? '챔피언 밴' : '챔피언 선택'}>
           <ChampGrid pool={(isBan ? snap.bannable : snap.pickable) ?? []} ready={ready} sel={sel}
@@ -578,6 +596,39 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
             className={`btn w-full mt-3 py-3 font-bold font-hud ${isBan ? 'btn-danger' : 'btn-blue'} disabled:opacity-40`}>{isBan ? '밴 확정' : '픽 확정'}</button>
         </Panel>
       ) : <p className="text-center text-sm text-[var(--muted)]">내 차례 대기 중…</p>}
+
+      {/* ARAM bench + reroll */}
+      {snap.benchEnabled && (
+        <Panel title={`벤치 교체 · 리롤 ${snap.rerolls ?? 0}`}>
+          <div className="flex gap-1.5 flex-wrap mb-2">
+            {(snap.bench ?? []).map((id) => (
+              <button key={id} onClick={() => send({ cmd: 'benchSwap', championId: id })}><ChampImg id={id} className="w-10 h-10 rounded ring-1 ring-[var(--gold-dim)]" /></button>
+            ))}
+            {!snap.bench?.length && <span className="text-xs text-[var(--muted)]">벤치가 비어 있어요</span>}
+          </div>
+          <button disabled={!snap.rerolls} onClick={() => send({ cmd: 'reroll' })} className="btn btn-ghost w-full py-2 text-sm disabled:opacity-40">리롤 ({snap.rerolls ?? 0})</button>
+        </Panel>
+      )}
+
+      {/* my skin + spells */}
+      {mine?.championId ? (
+        <Panel title="내 스킨 · 스펠">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSkinPick(true)} disabled={!mine.skins?.length}>
+              <ChampImg id={mine.championId} className="w-12 h-12 rounded ring-1 ring-[var(--gold-dim)]" />
+            </button>
+            <button onClick={() => send({ cmd: 'csSelect', spell1: mine.spell2, spell2: mine.spell1 })} title="D/F 교환" className="btn btn-ghost px-2 py-1 text-xs">⇄</button>
+            <button onClick={() => setSpellPick(true)} className="flex gap-1">
+              {[mine.spell1, mine.spell2].map((sp, j) => ready && sp ? <img key={j} src={sumSpellIcon(sp)} className="w-7 h-7 rounded ring-1 ring-[var(--gold-dim)]" /> : <span key={j} className="w-7 h-7 rounded bg-[#122235]" />)}
+            </button>
+          </div>
+        </Panel>
+      ) : null}
+
+      {spellPick && mine && <SpellPickerModal current={[mine.spell1, mine.spell2]} onClose={() => setSpellPick(false)}
+        onPick={(spell1, spell2) => send({ cmd: 'csSelect', spell1, spell2 })} />}
+      {skinPick && mine && <SkinPickerModal skins={mine.skins || []} current={mine.skinId} champKey={champ(mine.championId)?.key || ''}
+        onClose={() => setSkinPick(false)} onPick={(skinId) => { send({ cmd: 'csSelect', skinId }); setSkinPick(false); }} />}
     </main>
   );
 }

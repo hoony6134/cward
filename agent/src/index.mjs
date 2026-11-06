@@ -58,6 +58,7 @@ async function tick() {
         const snap = shapeChampSelect(session, pickable, bannable);
         lastAction = snap.myAction?.id ?? null;
         await ensureRecPos();
+        if (snap.mine?.championId) snap.mine.skins = await ensureSkins(snap.mine.championId);
         logKind('champ-select');
         relay.send({ ...snap, me, recPos, owned: await ensureOwned() });
       } else if (phase === 'Lobby') {
@@ -222,6 +223,18 @@ async function runCommand({ cmd, ...a }) {
       if (!slots[a.index]) return console.log('[cmd] no slot', a.index);
       slots[a.index].perks = JSON.stringify({ perkIds: a.perkIds, perkStyle: a.perkStyle, perkSubStyle: a.perkSubStyle });
       return void (await lcuPut(lcu, '/lol-lobby/v1/lobby/members/localMember/player-slots', slots));
+    }
+    case 'reroll':       return void (await lcuPost(lcu, '/lol-champ-select/v1/session/my-selection/reroll'));
+    case 'benchSwap':    return void (await lcuPost(lcu, `/lol-champ-select/v1/session/bench/swap/${a.championId}`));
+    case 'tradeRequest': return void (await lcuPost(lcu, `/lol-champ-select/v1/session/trades/${a.id}/request`));
+    case 'tradeAccept':  return void (await lcuPost(lcu, `/lol-champ-select/v1/session/trades/${a.id}/accept`));
+    case 'tradeDecline': return void (await lcuPost(lcu, `/lol-champ-select/v1/session/trades/${a.id}/decline`));
+    case 'csSelect': {   // champ-select skin/spell via my-selection
+      const body = {};
+      if (a.skinId) body.selectedSkinId = a.skinId;
+      if (a.spell1) body.spell1Id = a.spell1;
+      if (a.spell2) body.spell2Id = a.spell2;
+      return void (await lcuPatch(lcu, '/lol-champ-select/v1/session/my-selection', body));
     }
     case 'pick':
     case 'ban':

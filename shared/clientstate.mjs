@@ -107,5 +107,12 @@ export function shapeChampSelect(session, pickable = [], bannable = []) {
     },
     pickable, // champion ids the client allows picking now
     bannable,
+    // ARAM/bench + trades + my current selection (for reroll/bench/trade/skin/spell)
+    benchEnabled: !!session?.benchEnabled,
+    bench: (session?.benchChampions ?? []).map((b) => b.championId),
+    rerolls: session?.rerollsRemaining ?? 0,
+    trades: (session?.trades ?? []).filter((t) => t.state && t.state !== 'INVALID' && t.state !== 'BUSY')
+      .map((t) => ({ id: t.id, cellId: t.cellId, state: t.state })),
+    mine: (() => { const m = (session?.myTeam ?? []).find((p) => p.cellId === myCell); return m ? { championId: m.championId || 0, skinId: m.selectedSkinId || 0, spell1: m.spell1Id || 0, spell2: m.spell2Id || 0 } : null; })(),
   };
 }

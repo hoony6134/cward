@@ -69,7 +69,7 @@ export default function App() {
           : <Waiting status={status} clientOff={kind === 'off' || kind === 'idle'} phase={snap.phase} />}
       </div>
 
-      <button onClick={clearPairing} className="mt-8 mx-auto block text-xs text-[var(--muted)]/60 underline">페어링 해제</button>
+      <button onClick={() => { if (confirm('페어링을 해제할까요? 다시 링크로 연결해야 해요.')) clearPairing(); }} className="mt-8 mx-auto block text-xs text-[var(--muted)]/60 underline">페어링 해제</button>
     </div>
   );
 }

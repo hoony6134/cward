@@ -345,19 +345,17 @@ function Menu({ snap, send }: { snap: Snapshot; send: (c: Command) => void }) {
   );
 }
 
-function LootPanel({ loot, send }: { loot: NonNullable<Snapshot['loot']>; send: (c: Command) => void }) {
-  const dis = (type: 'champ' | 'skin', n: number, val: number, cur: string) =>
-    n > 0 ? <button onClick={() => { if (confirm(`${type === 'champ' ? '챔피언' : '스킨'} 조각 ${n}개를 분해할까요? ${cur} +${val}`)) send({ cmd: 'disenchant', type }); }}
-      className="btn btn-ghost w-full py-2 text-sm">{type === 'champ' ? '챔피언' : '스킨'} 조각 {n}개 분해 (+{val})</button> : null;
+function LootPanel({ loot }: { loot: NonNullable<Snapshot['loot']> }) {
   return (
     <Panel title="전리품">
-      <div className="grid grid-cols-2 gap-y-1 text-sm mb-2">
+      <div className="grid grid-cols-2 gap-y-1 text-sm">
         <span>파랑 정수 <b className="text-[var(--blue)]">{loot.blue.toLocaleString('ko-KR')}</b></span>
         <span>주황 정수 <b className="text-[var(--gold)]">{loot.orange.toLocaleString('ko-KR')}</b></span>
         <span>신화 정수 <b>{loot.mythic}</b></span>
         <span>상자 {loot.chests} · 열쇠 {loot.keys}</span>
+        <span>챔프 조각 <b>{loot.champShards.n}</b></span>
+        <span>스킨 조각 <b>{loot.skinShards.n}</b></span>
       </div>
-      <div className="space-y-2">{dis('champ', loot.champShards.n, loot.champShards.value, '파랑')}{dis('skin', loot.skinShards.n, loot.skinShards.value, '주황')}</div>
     </Panel>
   );
 }
@@ -383,15 +381,16 @@ function IconPickerModal({ icons, current, ready, onClose, onPick }: { icons: nu
 function MoreDrawer({ snap, send, ready, onClose }: { snap: Snapshot; send: (c: Command) => void; ready: boolean; onClose: () => void }) {
   const [iconOpen, setIconOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  // Show only one sheet at a time (nested sheets look broken).
+  if (iconOpen) return <IconPickerModal icons={snap.icons || []} current={snap.me?.iconId || 0} ready={ready} onClose={() => setIconOpen(false)} onPick={(id) => { send({ cmd: 'setIcon', iconId: id }); setIconOpen(false); }} />;
+  if (friendsOpen) return <FriendsModal friends={snap.friends || []} ready={ready} onClose={() => setFriendsOpen(false)} onInvite={(sid) => send({ cmd: 'inviteFriend', summonerId: sid })} send={send} />;
   return (
-    <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
+    <div className="fixed inset-0 z-20 bg-black/80 flex items-end" onClick={onClose}>
       <div className="panel w-full p-4 max-h-[88dvh] overflow-y-auto space-y-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between"><h2 className="panel-title">메뉴</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
         <ProfilePanel me={snap.me} ready={ready} onEditIcon={() => setIconOpen(true)} />
         <button onClick={() => setFriendsOpen(true)} className="btn btn-ghost w-full py-2 text-sm">친구 초대 · 메시지</button>
-        {snap.loot && <LootPanel loot={snap.loot} send={send} />}
-        {iconOpen && <IconPickerModal icons={snap.icons || []} current={snap.me?.iconId || 0} ready={ready} onClose={() => setIconOpen(false)} onPick={(id) => { send({ cmd: 'setIcon', iconId: id }); setIconOpen(false); }} />}
-        {friendsOpen && <FriendsModal friends={snap.friends || []} ready={ready} onClose={() => setFriendsOpen(false)} onInvite={(sid) => send({ cmd: 'inviteFriend', summonerId: sid })} send={send} />}
+        {snap.loot && <LootPanel loot={snap.loot} />}
       </div>
     </div>
   );

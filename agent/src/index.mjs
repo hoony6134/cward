@@ -214,12 +214,6 @@ async function runCommand({ cmd, ...a }) {
     case 'setPosition':   return void (await lcuPut(lcu, '/lol-lobby/v2/lobby/members/localMember/position-preferences', { firstPreference: a.first, secondPreference: a.second }));
     case 'inviteFriend':  return void (await lcuPost(lcu, '/lol-lobby/v2/lobby/invitations', [{ toSummonerId: a.summonerId }]));
     case 'setIcon':       icons = null; return void (await lcuPut(lcu, '/lol-summoner/v1/current-summoner/icon', { profileIconId: a.iconId }));
-    case 'disenchant': {  // mass-disenchant all champion or skin shards
-      const type = a.type === 'skin' ? 'SKIN_RENTAL' : 'CHAMPION_RENTAL';
-      const loot = await lcuGet(lcu, '/lol-loot/v1/player-loot');
-      for (const l of loot.filter((x) => x.type === type)) await lcuPost(lcu, `/lol-loot/v1/recipes/${type}_disenchant/craft?repeat=${l.count || 1}`, [l.lootId]).catch(() => {});
-      return;
-    }
     case 'dodge':         return void (await lcuPost(lcu, `/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call&args=${encodeURIComponent(JSON.stringify(['', 'teambuilder-draft', 'quitV2', '']))}`));
     case 'honor': {       // post-game honor a teammate
       const cfg = await lcuGet(lcu, '/lol-honor-v2/v1/config').catch(() => null);

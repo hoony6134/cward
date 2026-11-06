@@ -480,6 +480,11 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                 </button>
                 <div className="flex-1 space-y-1.5">
                   <div className="flex items-center gap-2">
+                    {s.skins?.length ? (
+                      <button onClick={() => setSkinPick({ slot: i })} className="btn btn-ghost text-xs px-2 py-1 truncate max-w-[55%]">
+                        스킨: {s.skins.find((sk) => sk.id === s.skinId)?.name || '기본'}
+                      </button>
+                    ) : null}
                     <div className="flex items-center gap-1 ml-auto">
                       <button onClick={() => send({ cmd: 'setSlotSpells', index: i, spell1: s.spell2, spell2: s.spell1 })} title="D/F 교환" className="btn btn-ghost px-1.5 py-1 text-xs">⇄</button>
                       <button onClick={() => setSpellPick({ slot: i })} className="flex gap-0.5" >
@@ -521,14 +526,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                       );
                     })}
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {s.skins?.length ? (
-                      <button onClick={() => setSkinPick({ slot: i })} className="btn btn-ghost text-xs px-2 py-1">
-                        스킨: {s.skins.find((sk) => sk.id === s.skinId)?.name || '기본'}
-                      </button>
-                    ) : null}
-                    <SlotItemReco champId={s.championId} mapId={snap.mapId ?? 11} ready={ready} />
-                  </div>
+                  <SlotItemReco champId={s.championId} mapId={snap.mapId ?? 11} ready={ready} />
                 </div>
               </li>
             ))}

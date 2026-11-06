@@ -82,11 +82,11 @@ async function tick() {
         // Client open at the main menu (None) or other non-lobby state: offer mode select.
         await ensureQueues();
         logKind('menu:' + phase);
-        relay.send({ kind: 'menu', t: Date.now(), phase, me, autoAccept, queues, friends: await getFriends() });
+        relay.send({ kind: 'menu', t: Date.now(), phase, me, autoAccept, queues, friends: await getFriends(), icons: await ensureIcons(), loot: await getLoot() });
       }
       return schedule(idleMs);
     } catch {
-      lcu = null; queues = []; me = null; recPos = null; owned = null; sid = null; skinCache = {}; // client closed; rediscover next tick
+      lcu = null; queues = []; me = null; recPos = null; owned = null; sid = null; skinCache = {}; icons = null; // client closed; rediscover next tick
       for (const k in recSetCache) delete recSetCache[k];
     }
   }
@@ -141,9 +141,32 @@ async function getMe() {
     const solo = rk?.queueMap?.RANKED_SOLO_5x5;
     const rank = solo && solo.tier && solo.tier !== 'NONE' ? { tier: solo.tier, div: solo.division, lp: solo.leaguePoints, w: solo.wins, l: solo.losses } : null;
     const mas = await lcuGet(lcu, `/lol-champion-mastery/v1/${s.puuid}/champion-mastery`).catch(() => []);
-    const mastery = mas.sort((a, b) => b.championPoints - a.championPoints).slice(0, 3).map((m) => ({ id: m.championId, lv: m.championLevel, pt: m.championPoints }));
-    return { name: s.gameName || s.displayName || '', tag: s.tagLine || '', iconId: s.profileIconId ?? 0, level: s.summonerLevel ?? 0, rank, mastery };
+    const sorted = mas.sort((a, b) => b.championPoints - a.championPoints);
+    const mastery = sorted.slice(0, 3).map((m) => ({ id: m.championId, lv: m.championLevel, pt: m.championPoints }));
+    const mByChamp = Object.fromEntries(sorted.map((m) => [m.championId, m.championLevel]));
+    return { name: s.gameName || s.displayName || '', tag: s.tagLine || '', iconId: s.profileIconId ?? 0, level: s.summonerLevel ?? 0, rank, mastery, mByChamp };
   } catch { return null; }
+}
+
+let icons = null; // owned summoner icon ids
+async function ensureIcons() {
+  if (icons) return icons;
+  const inv = await lcuGet(lcu, '/lol-inventory/v2/inventory/SUMMONER_ICON').catch(() => []);
+  return (icons = inv.map((i) => i.itemId).filter((id) => id > 0).sort((a, b) => a - b));
+}
+
+// Loot summary: essences + disenchantable shard ids + chests/keys.
+async function getLoot() {
+  const loot = await lcuGet(lcu, '/lol-loot/v1/player-loot').catch(() => []);
+  const cur = (name) => loot.find((l) => l.lootId === name)?.count ?? 0;
+  const ids = (type) => loot.filter((l) => l.type === type);
+  const champ = ids('CHAMPION_RENTAL'); const skin = ids('SKIN_RENTAL'); const chest = ids('CHEST'); const key = loot.find((l) => /KEY$/.test(l.lootId) || l.lootId === 'MATERIAL_key');
+  return {
+    blue: cur('CURRENCY_champion'), orange: cur('CURRENCY_cosmetic'), mythic: cur('CURRENCY_mythic'), rp: cur('CURRENCY_RP'),
+    champShards: { n: champ.reduce((s, l) => s + (l.count || 1), 0), value: champ.reduce((s, l) => s + (l.disenchantValue || 0) * (l.count || 1), 0) },
+    skinShards: { n: skin.reduce((s, l) => s + (l.count || 1), 0), value: skin.reduce((s, l) => s + (l.disenchantValue || 0) * (l.count || 1), 0) },
+    chests: chest.reduce((s, l) => s + (l.count || 1), 0), keys: key?.count ?? 0,
+  };
 }
 
 // Online, invitable friends.
@@ -182,6 +205,14 @@ async function runCommand({ cmd, ...a }) {
     case 'setMode':       return void (await lcuPost(lcu, '/lol-lobby/v2/lobby', { queueId: a.queueId }));
     case 'setPosition':   return void (await lcuPut(lcu, '/lol-lobby/v2/lobby/members/localMember/position-preferences', { firstPreference: a.first, secondPreference: a.second }));
     case 'inviteFriend':  return void (await lcuPost(lcu, '/lol-lobby/v2/lobby/invitations', [{ toSummonerId: a.summonerId }]));
+    case 'setIcon':       icons = null; return void (await lcuPut(lcu, '/lol-summoner/v1/current-summoner/icon', { profileIconId: a.iconId }));
+    case 'disenchant': {  // mass-disenchant all champion or skin shards
+      const type = a.type === 'skin' ? 'SKIN_RENTAL' : 'CHAMPION_RENTAL';
+      const loot = await lcuGet(lcu, '/lol-loot/v1/player-loot');
+      for (const l of loot.filter((x) => x.type === type)) await lcuPost(lcu, `/lol-loot/v1/recipes/${type}_disenchant/craft?repeat=${l.count || 1}`, [l.lootId]).catch(() => {});
+      return;
+    }
+    case 'dodge':         return void (await lcuPost(lcu, `/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call&args=${encodeURIComponent(JSON.stringify(['', 'teambuilder-draft', 'quitV2', '']))}`));
     case 'startQueue':    return void (await lcuPost(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
     case 'stopQueue':     return void (await lcuDelete(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
     case 'acceptReady':   return void (await lcuPost(lcu, '/lol-matchmaking/v1/ready-check/accept'));

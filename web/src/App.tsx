@@ -185,7 +185,6 @@ function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean })
           </li>
         ))}
       </ul>
-      <p className="text-[10px] text-[var(--muted)]/60 mt-2">궁 쿨 = 공식값(레벨로 R랭크 추정) × 아이템 능력가속 반영 · 룬 가속은 Riot이 상대 룬을 안 줘서 미반영</p>
     </Panel>
   );
 }
@@ -205,7 +204,7 @@ function ItemReco({ champKey, mapId, ready }: { champKey: string; mapId: number;
   useEffect(() => { if (champKey) loadRecommended(champKey, mapId).then(setItems); }, [champKey, mapId]);
   if (!items.length) return null;
   return (
-    <Panel title="추천 아이템 · Riot 기본">
+    <Panel title="추천 아이템">
       <div className="flex gap-1.5 flex-wrap">
         {ready && items.map((id, i) => <img key={i} src={itemIcon(id)} className="w-8 h-8 rounded ring-1 ring-[var(--gold-dim)]" loading="lazy" />)}
       </div>
@@ -334,21 +333,60 @@ function ModePicker({ snap, send }: { snap: Snapshot; send: (c: Command) => void
 
 // Client open at main menu (no lobby yet): pick a mode to create a lobby from the phone.
 function Menu({ snap, send, ready }: { snap: Snapshot; send: (c: Command) => void; ready: boolean }) {
+  const [iconOpen, setIconOpen] = useState(false);
   return (
     <main className="px-3 space-y-3 mt-3">
-      <ProfilePanel me={snap.me} ready={ready} />
-      <p className="text-sm text-[var(--muted)] text-center">모드를 선택하면 PC에 로비가 생성돼요.</p>
+      <ProfilePanel me={snap.me} ready={ready} onEditIcon={() => setIconOpen(true)} />
       <ModePicker snap={snap} send={send} />
+      {snap.loot && <LootPanel loot={snap.loot} send={send} />}
+      {iconOpen && <IconPickerModal icons={snap.icons || []} current={snap.me?.iconId || 0} ready={ready}
+        onClose={() => setIconOpen(false)} onPick={(id) => { send({ cmd: 'setIcon', iconId: id }); setIconOpen(false); }} />}
     </main>
   );
 }
 
-function ProfilePanel({ me, ready }: { me: Snapshot['me']; ready: boolean }) {
+function LootPanel({ loot, send }: { loot: NonNullable<Snapshot['loot']>; send: (c: Command) => void }) {
+  const dis = (type: 'champ' | 'skin', n: number, val: number, cur: string) =>
+    n > 0 ? <button onClick={() => { if (confirm(`${type === 'champ' ? '챔피언' : '스킨'} 조각 ${n}개를 분해할까요? ${cur} +${val}`)) send({ cmd: 'disenchant', type }); }}
+      className="btn btn-ghost w-full py-2 text-sm">{type === 'champ' ? '챔피언' : '스킨'} 조각 {n}개 분해 (+{val})</button> : null;
+  return (
+    <Panel title="전리품">
+      <div className="grid grid-cols-2 gap-y-1 text-sm mb-2">
+        <span>파랑 정수 <b className="text-[var(--blue)]">{loot.blue.toLocaleString('ko-KR')}</b></span>
+        <span>주황 정수 <b className="text-[var(--gold)]">{loot.orange.toLocaleString('ko-KR')}</b></span>
+        <span>신화 정수 <b>{loot.mythic}</b></span>
+        <span>상자 {loot.chests} · 열쇠 {loot.keys}</span>
+      </div>
+      <div className="space-y-2">{dis('champ', loot.champShards.n, loot.champShards.value, '파랑')}{dis('skin', loot.skinShards.n, loot.skinShards.value, '주황')}</div>
+    </Panel>
+  );
+}
+
+function IconPickerModal({ icons, current, ready, onClose, onPick }: { icons: number[]; current: number; ready: boolean; onClose: () => void; onPick: (id: number) => void }) {
+  return (
+    <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
+      <div className="panel w-full p-4 h-[70dvh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-2"><h2 className="panel-title">소환사 아이콘</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
+        <div className="grid grid-cols-6 gap-1.5 overflow-y-auto">
+          {ready && icons.map((id) => (
+            <button key={id} onClick={() => onPick(id)} className={`rounded-full overflow-hidden ring-2 ${id === current ? 'ring-[var(--gold)]' : 'ring-transparent'}`}>
+              <img src={profileIcon(id)} className="w-full aspect-square" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfilePanel({ me, ready, onEditIcon }: { me: Snapshot['me']; ready: boolean; onEditIcon?: () => void }) {
   if (!me) return null;
   return (
     <Panel title="내 정보">
       <div className="flex items-center gap-2 mb-1.5">
-        {ready && me.iconId > 0 ? <img src={profileIcon(me.iconId)} className="w-7 h-7 rounded-full ring-1 ring-[var(--gold-dim)]" /> : <span className="w-7 h-7 rounded-full bg-[#122235] block" />}
+        <button onClick={onEditIcon} disabled={!onEditIcon}>
+          {ready && me.iconId > 0 ? <img src={profileIcon(me.iconId)} className="w-7 h-7 rounded-full ring-1 ring-[var(--gold-dim)]" /> : <span className="w-7 h-7 rounded-full bg-[#122235] block" />}
+        </button>
         <span className="text-sm font-medium truncate">{me.name}</span>
         <span className="text-xs text-[var(--muted)]">Lv {me.level}</span>
       </div>
@@ -424,7 +462,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                     <span className="text-xs text-[var(--muted)]">{i === 0 ? '1번 슬롯' : '2번 슬롯'} · 우선순위 {posKo(s.position)}</span>
                     <div className="flex items-center gap-1 ml-auto">
                       <button onClick={() => send({ cmd: 'setSlotSpells', index: i, spell1: s.spell2, spell2: s.spell1 })} title="D/F 교환" className="btn btn-ghost px-1.5 py-1 text-xs">⇄</button>
-                      <button onClick={() => setSpellPick({ slot: i })} className="flex gap-0.5" title="스펠 변경">
+                      <button onClick={() => setSpellPick({ slot: i })} className="flex gap-0.5" >
                         {[s.spell1, s.spell2].map((sp, j) => ready && sp
                           ? <img key={j} src={sumSpellIcon(sp)} className="w-6 h-6 rounded ring-1 ring-[var(--gold-dim)]" />
                           : <span key={j} className="w-6 h-6 rounded bg-[#122235]" />)}
@@ -443,17 +481,15 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                     })}
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] text-[var(--muted)]">룬</span>
                     {/* current keystone */}
                     {s.perks?.perkIds?.[0] ? (ready && perkIcon(s.perks.perkIds[0])
-                      ? <img src={perkIcon(s.perks.perkIds[0])} title="현재 룬" className="w-6 h-6 rounded-full bg-[#0a1420] ring-1 ring-[var(--gold)]" />
+                      ? <img src={perkIcon(s.perks.perkIds[0])} className="w-6 h-6 rounded-full bg-[#0a1420] ring-1 ring-[var(--gold)]" />
                       : <span className="skeleton w-6 h-6 rounded-full" />) : null}
                     {/* recommended sets, matching one highlighted */}
                     {s.recSets?.map((set, si) => {
                       const on = sameRunes(s.perks, set);
                       return (
-                        <button key={si} title={on ? '현재 선택된 추천 세트' : '이 추천 세트 적용'}
-                          onClick={() => send({ cmd: 'applyRecommendedSet', index: i, perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle, spell1: set.spells[0], spell2: set.spells[1] })}
+                        <button key={si} onClick={() => send({ cmd: 'applyRecommendedSet', index: i, perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle, spell1: set.spells[0], spell2: set.spells[1] })}
                           className={`flex items-center gap-0.5 px-1.5 py-1 rounded ${on ? 'bg-[var(--gold)]/20 ring-2 ring-[var(--gold)]' : 'btn btn-ghost'}`}>
                           {set.keyIcon ? <img src={set.keyIcon} className="w-5 h-5" /> : <span className="skeleton w-5 h-5 rounded-full" />}
                           {ready && set.spells.map((sp, j) => sp ? <img key={j} src={sumSpellIcon(sp)} className="w-3.5 h-3.5 rounded-sm" /> : null)}
@@ -474,7 +510,6 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
               </li>
             ))}
           </ul>
-          <p className="text-[10px] text-[var(--muted)]/60 mt-3">초상화 → 챔피언 · 스펠 아이콘 → 소환사 주문 · 라인 아이콘 → 포지션</p>
         </Panel>
       ) : null}
 
@@ -501,7 +536,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
 
       <button onClick={() => send({ cmd: 'startQueue' })} className="btn btn-blue w-full py-3 font-bold text-lg font-hud tracking-wide">대전 찾기</button>
 
-      {pick && <ChampPickerModal lane={snap.slots?.[pick.slot]?.position || ''} recPos={snap.recPos} owned={snap.owned} onClose={() => setPick(null)}
+      {pick && <ChampPickerModal lane={snap.slots?.[pick.slot]?.position || ''} recPos={snap.recPos} owned={snap.owned} mByChamp={snap.me?.mByChamp} onClose={() => setPick(null)}
         onPick={(championId) => { send({ cmd: 'setSlotChampion', index: pick.slot, championId }); setPick(null); }} />}
       {spellPick && snap.slots?.[spellPick.slot] && (
         <SpellPickerModal current={[snap.slots[spellPick.slot].spell1, snap.slots[spellPick.slot].spell2]} onClose={() => setSpellPick(null)}
@@ -537,7 +572,6 @@ function SlotItemReco({ champId, mapId, ready }: { champId: number; mapId: numbe
   if (!items.length) return null;
   return (
     <div className="flex items-center gap-1">
-      <span className="text-[10px] text-[var(--muted)]">추천템</span>
       {ready && items.map((id, i) => <img key={i} src={itemIcon(id)} className="w-5 h-5 rounded-sm ring-1 ring-[var(--gold-dim)]" loading="lazy" />)}
     </div>
   );
@@ -636,6 +670,9 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
         </Panel>
       ) : null}
 
+      <button onClick={() => { if (confirm('챔피언 선택에서 나가면 닷지 처리돼요 (LP 감소 + 대기열 제한). 나갈까요?')) send({ cmd: 'dodge' }); }}
+        className="btn btn-danger w-full py-2 text-sm">나가기 (닷지)</button>
+
       {spellPick && mine && <SpellPickerModal current={[mine.spell1, mine.spell2]} onClose={() => setSpellPick(false)}
         onPick={(spell1, spell2) => send({ cmd: 'csSelect', spell1, spell2 })} />}
       {skinPick && mine && <SkinPickerModal skins={mine.skins || []} current={mine.skinId} champKey={champ(mine.championId)?.key || ''}
@@ -696,7 +733,7 @@ function getFav(pos: string): number[] { try { return JSON.parse(localStorage.ge
 function setFav(pos: string, ids: number[]) { try { localStorage.setItem(favKey(pos), JSON.stringify(ids)); } catch { /* ignore */ } }
 
 // Full-roster picker (for Swiftplay slots): all champions + per-lane favorites + Riot's lane recommendations.
-function ChampPickerModal({ lane, recPos, owned, onClose, onPick }: { lane: string; recPos?: Record<string, string[]>; owned?: number[]; onClose: () => void; onPick: (id: number) => void }) {
+function ChampPickerModal({ lane, recPos, owned, mByChamp, onClose, onPick }: { lane: string; recPos?: Record<string, string[]>; owned?: number[]; mByChamp?: Record<string, number>; onClose: () => void; onPick: (id: number) => void }) {
   const [fav, setFavState] = useState(() => getFav(lane));
   const [q, setQ] = useState('');
   const [recOnly, setRecOnly] = useState(false);
@@ -728,14 +765,15 @@ function ChampPickerModal({ lane, recPos, owned, onClose, onPick }: { lane: stri
         {recPos && lane && (
           <label className="flex items-center gap-2 mb-2 text-sm">
             <Toggle on={recOnly} onChange={setRecOnly} />
-            <span>{posKo(lane)} 추천 챔피언만 <span className="text-[var(--muted)] text-xs">(Riot 제공)</span></span>
+            <span>{posKo(lane)} 추천 챔피언만</span>
           </label>
         )}
         <div className="grid grid-cols-5 gap-1.5 overflow-y-auto">
           {list.map((c) => (
             <div key={c.id} className="relative">
               <button onClick={() => onPick(c.id)} className="w-full"><img src={champIconById(c.id)} alt={c.name} className={`w-full aspect-square rounded ${has(c.id) ? '' : 'grayscale opacity-40'}`} loading="lazy" /></button>
-              <button onClick={() => toggle(c.id)} title="즐겨찾기"
+              {mByChamp?.[String(c.id)] ? <span className="absolute bottom-0.5 left-0.5 text-[9px] font-bold bg-black/75 text-[var(--gold)] rounded px-1">M{mByChamp[String(c.id)]}</span> : null}
+              <button onClick={() => toggle(c.id)}
                 className={`absolute top-0.5 right-0.5 w-5 h-5 grid place-items-center text-xs rounded-full bg-black/70 ${fav.includes(c.id) ? 'text-[var(--gold)]' : 'text-white/80'}`}>★</button>
             </div>
           ))}

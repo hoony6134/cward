@@ -15,8 +15,11 @@ export type Snapshot = {
     name: string; tag: string; iconId: number; level: number;
     rank?: { tier: string; div: string; lp: number; w: number; l: number } | null;
     mastery?: { id: number; lv: number; pt: number }[];
+    mByChamp?: Record<string, number>;
   };
   friends?: { name: string; sid: number; avail: string; note?: string; icon?: number; status?: string }[];
+  icons?: number[];
+  loot?: { blue: number; orange: number; mythic: number; rp: number; champShards: { n: number; value: number }; skinShards: { n: number; value: number }; chests: number; keys: number };
   autoAccept?: boolean;
   recPos?: Record<string, string[]>; // championId -> Riot recommended lanes
   // in-game

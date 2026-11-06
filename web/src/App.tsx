@@ -481,8 +481,8 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                 <div className="flex-1 space-y-1.5">
                   <div className="flex items-center gap-2">
                     {s.skins?.length ? (
-                      <button onClick={() => setSkinPick({ slot: i })} className="btn btn-ghost text-xs px-2 py-1 truncate max-w-[55%]">
-                        스킨: {s.skins.find((sk) => sk.id === s.skinId)?.name || '기본'}
+                      <button onClick={() => setSkinPick({ slot: i })} className="btn btn-ghost text-xs px-2 py-1 truncate max-w-[60%]">
+                        {s.skins.find((sk) => sk.id === s.skinId)?.name || '기본'}
                       </button>
                     ) : null}
                     <div className="flex items-center gap-1 ml-auto">
@@ -906,9 +906,9 @@ function SkinPickerModal({ skins, current, champKey, onClose, onPick }: { skins:
             <button key={sk.id} onClick={() => onPick(sk.id)}
               className={`relative rounded overflow-hidden ring-2 ${sk.id === current ? 'ring-[var(--gold)]' : 'ring-transparent'}`}>
               {sk.chroma
-                ? <div className="w-full aspect-[16/9] flex items-center justify-center" style={{ background: sk.color }}><span className="w-6 h-6 rounded-full ring-2 ring-white/70" style={{ background: sk.color }} /></div>
+                ? <div className="w-full aspect-[16/9] grid place-items-center bg-[#0a1420]"><span className="w-8 h-8 rounded-full ring-2 ring-white/80" style={{ background: sk.color }} /></div>
                 : <img src={skinArt(champKey, sk.id % 1000)} alt={sk.name} className="w-full aspect-[16/9] object-cover object-top" loading="lazy" />}
-              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[11px] py-0.5 truncate px-1">{sk.chroma ? `└ ${sk.name}` : sk.name}</span>
+              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[11px] py-0.5 truncate px-1">{sk.name}</span>
             </button>
           ))}
         </div>

@@ -11,7 +11,12 @@ export type Cell = { cellId: number; championId: number; position: string; me: b
 export type Snapshot = {
   kind?: 'ingame' | 'lobby' | 'champselect' | 'readycheck' | 'searching' | 'menu' | 'off' | 'client' | 'idle';
   t: number; phase: string | null;
-  me?: { name: string; tag: string; iconId: number; level: number };
+  me?: {
+    name: string; tag: string; iconId: number; level: number;
+    rank?: { tier: string; div: string; lp: number; w: number; l: number } | null;
+    mastery?: { id: number; lv: number; pt: number }[];
+  };
+  friends?: { name: string; sid: number; avail: string }[];
   autoAccept?: boolean;
   recPos?: Record<string, string[]>; // championId -> Riot recommended lanes
   // in-game

@@ -68,7 +68,7 @@ async function tick() {
           s.recSets = await ensureRecSets(s.championId, s.position, lob.mapId);
         }
         logKind('lobby');
-        relay.send({ ...lob, me, autoAccept, recPos, owned: await ensureOwned() });
+        relay.send({ ...lob, me, autoAccept, recPos, owned: await ensureOwned(), friends: await getFriends() });
       } else if (phase === 'Matchmaking') {
         const s = await lcuGet(lcu, '/lol-matchmaking/v1/search').catch(() => ({}));
         logKind('searching');
@@ -81,7 +81,7 @@ async function tick() {
         // Client open at the main menu (None) or other non-lobby state: offer mode select.
         await ensureQueues();
         logKind('menu:' + phase);
-        relay.send({ kind: 'menu', t: Date.now(), phase, me, autoAccept, queues });
+        relay.send({ kind: 'menu', t: Date.now(), phase, me, autoAccept, queues, friends: await getFriends() });
       }
       return schedule(idleMs);
     } catch {
@@ -136,8 +136,21 @@ async function getMe() {
   try {
     const s = await lcuGet(lcu, '/lol-summoner/v1/current-summoner');
     sid = s.summonerId;
-    return { name: s.gameName || s.displayName || '', tag: s.tagLine || '', iconId: s.profileIconId ?? 0, level: s.summonerLevel ?? 0 };
+    const rk = await lcuGet(lcu, '/lol-ranked/v1/current-ranked-stats').catch(() => null);
+    const solo = rk?.queueMap?.RANKED_SOLO_5x5;
+    const rank = solo && solo.tier && solo.tier !== 'NONE' ? { tier: solo.tier, div: solo.division, lp: solo.leaguePoints, w: solo.wins, l: solo.losses } : null;
+    const mas = await lcuGet(lcu, `/lol-champion-mastery/v1/${s.puuid}/champion-mastery`).catch(() => []);
+    const mastery = mas.sort((a, b) => b.championPoints - a.championPoints).slice(0, 3).map((m) => ({ id: m.championId, lv: m.championLevel, pt: m.championPoints }));
+    return { name: s.gameName || s.displayName || '', tag: s.tagLine || '', iconId: s.profileIconId ?? 0, level: s.summonerLevel ?? 0, rank, mastery };
   } catch { return null; }
+}
+
+// Online, invitable friends.
+async function getFriends() {
+  const fr = await lcuGet(lcu, '/lol-chat/v1/friends').catch(() => []);
+  return fr.filter((f) => f.availability && f.availability !== 'offline' && f.summonerId)
+    .map((f) => ({ name: f.gameName || f.name || '', sid: f.summonerId, avail: f.availability }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 }
 
 let owned = null; // owned champion ids
@@ -167,6 +180,7 @@ async function runCommand({ cmd, ...a }) {
   switch (cmd) {
     case 'setMode':       return void (await lcuPost(lcu, '/lol-lobby/v2/lobby', { queueId: a.queueId }));
     case 'setPosition':   return void (await lcuPut(lcu, '/lol-lobby/v2/lobby/members/localMember/position-preferences', { firstPreference: a.first, secondPreference: a.second }));
+    case 'inviteFriend':  return void (await lcuPost(lcu, '/lol-lobby/v2/lobby/invitations', [{ toSummonerId: a.summonerId }]));
     case 'startQueue':    return void (await lcuPost(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
     case 'stopQueue':     return void (await lcuDelete(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
     case 'acceptReady':   return void (await lcuPost(lcu, '/lol-matchmaking/v1/ready-check/accept'));

@@ -65,7 +65,7 @@ export default function App() {
           : kind === 'lobby' ? <Lobby snap={snap} ready={ready} send={send} />
           : kind === 'readycheck' ? <ReadyCheck send={send} />
           : kind === 'searching' ? <Searching snap={snap} send={send} />
-          : kind === 'menu' ? <Menu snap={snap} send={send} />
+          : kind === 'menu' ? <Menu snap={snap} send={send} ready={ready} />
           : <Waiting status={status} clientOff={kind === 'off' || kind === 'idle'} phase={snap.phase} />}
       </div>
 
@@ -333,12 +333,59 @@ function ModePicker({ snap, send }: { snap: Snapshot; send: (c: Command) => void
 }
 
 // Client open at main menu (no lobby yet): pick a mode to create a lobby from the phone.
-function Menu({ snap, send }: { snap: Snapshot; send: (c: Command) => void }) {
+function Menu({ snap, send, ready }: { snap: Snapshot; send: (c: Command) => void; ready: boolean }) {
   return (
     <main className="px-3 space-y-3 mt-3">
+      <ProfilePanel me={snap.me} ready={ready} />
       <p className="text-sm text-[var(--muted)] text-center">모드를 선택하면 PC에 로비가 생성돼요.</p>
       <ModePicker snap={snap} send={send} />
     </main>
+  );
+}
+
+function ProfilePanel({ me, ready }: { me: Snapshot['me']; ready: boolean }) {
+  if (!me) return null;
+  return (
+    <Panel title="내 정보">
+      <div className="flex items-center justify-between">
+        <span className="text-sm">
+          {me.rank ? <><b className="text-[var(--gold)]">{me.rank.tier} {me.rank.div}</b> <span className="text-[var(--muted)]">{me.rank.lp}LP · {me.rank.w}승 {me.rank.l}패</span></>
+            : <span className="text-[var(--muted)]">솔로 랭크 기록 없음</span>}
+        </span>
+        {me.mastery?.length ? (
+          <div className="flex items-center gap-1.5">
+            {me.mastery.map((m) => (
+              <div key={m.id} className="relative">
+                {ready ? <img src={champIconById(m.id)} className="w-8 h-8 rounded" /> : <span className="skeleton w-8 h-8 rounded block" />}
+                <span className="absolute -bottom-1 -right-1 text-[9px] font-bold bg-[#070d16]/90 rounded px-0.5">{m.lv}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </Panel>
+  );
+}
+
+function FriendsModal({ friends, onClose, onInvite }: { friends: { name: string; sid: number; avail: string }[]; onClose: () => void; onInvite: (sid: number) => void }) {
+  const [sent, setSent] = useState<Set<number>>(new Set());
+  const color = (a: string) => (a === 'chat' || a === 'online' ? 'bg-[var(--blue)]' : a === 'dnd' ? 'bg-[var(--red)]' : a === 'mobile' ? 'bg-sky-400' : 'bg-[var(--gold)]');
+  return (
+    <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
+      <div className="panel w-full p-4 min-h-[60dvh] max-h-[85dvh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-2"><h2 className="panel-title">친구 초대 · 접속 중</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
+        <ul className="overflow-y-auto divide-y divide-[color:var(--line)]">
+          {friends.length ? friends.map((f) => (
+            <li key={f.sid} className="flex items-center gap-2 py-2">
+              <span className={`w-2 h-2 rounded-full ${color(f.avail)}`} />
+              <span className="truncate flex-1 text-sm">{f.name}</span>
+              <button disabled={sent.has(f.sid)} onClick={() => { onInvite(f.sid); setSent((s) => new Set(s).add(f.sid)); }}
+                className="btn btn-ghost text-xs px-3 py-1 disabled:opacity-40">{sent.has(f.sid) ? '초대됨' : '초대'}</button>
+            </li>
+          )) : <li className="text-sm text-[var(--muted)] py-4 text-center">접속 중인 친구가 없어요</li>}
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -347,8 +394,10 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
   const [spellPick, setSpellPick] = useState<{ slot: number } | null>(null);
   const [skinPick, setSkinPick] = useState<{ slot: number } | null>(null);
   const [runePick, setRunePick] = useState<{ slot: number } | null>(null);
+  const [friendsOpen, setFriendsOpen] = useState(false);
   return (
     <main className="px-3 space-y-3 mt-3">
+      <ProfilePanel me={snap.me} ready={ready} />
       <ModePicker snap={snap} send={send} />
 
       {snap.quickPlay && snap.slots?.length ? (
@@ -428,7 +477,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
       </section>
 
       <Panel title={`파티 ${snap.members?.length ?? 0}/${snap.maxSize ?? '?'}`}>
-        <ul className="text-sm space-y-1">
+        <ul className="text-sm space-y-1 mb-2">
           {(snap.members ?? []).map((m, i) => (
             <li key={i} className="flex items-center gap-2">
               <span className="text-[var(--gold)]">{m.leader ? '★' : '·'}</span><span className="truncate">{m.name || '소환사'}</span>
@@ -436,6 +485,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
             </li>
           ))}
         </ul>
+        <button onClick={() => setFriendsOpen(true)} className="btn btn-ghost w-full py-2 text-sm">친구 초대</button>
       </Panel>
 
       <button onClick={() => send({ cmd: 'startQueue' })} className="btn btn-blue w-full py-3 font-bold text-lg font-hud tracking-wide">대전 찾기</button>
@@ -455,6 +505,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
         <RuneEditorModal current={snap.slots[runePick.slot].perks ?? null} onClose={() => setRunePick(null)}
           onApply={(perkIds, perkStyle, perkSubStyle) => { send({ cmd: 'setSlotPerks', index: runePick.slot, perkIds, perkStyle, perkSubStyle }); setRunePick(null); }} />
       )}
+      {friendsOpen && <FriendsModal friends={snap.friends || []} onClose={() => setFriendsOpen(false)} onInvite={(sid) => send({ cmd: 'inviteFriend', summonerId: sid })} />}
     </main>
   );
 }

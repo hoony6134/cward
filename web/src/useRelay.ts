@@ -9,7 +9,8 @@ export type Player = {
 };
 export type Cell = { cellId: number; championId: number; position: string; me: boolean };
 export type Snapshot = {
-  kind?: 'ingame' | 'lobby' | 'champselect' | 'readycheck' | 'searching' | 'menu' | 'off' | 'client' | 'idle';
+  kind?: 'ingame' | 'lobby' | 'champselect' | 'readycheck' | 'searching' | 'menu' | 'postgame' | 'off' | 'client' | 'idle';
+  ballot?: { gameId: number; allies: { sid: number; puuid: string; name: string; champId: number }[] } | null;
   t: number; phase: string | null;
   me?: {
     name: string; tag: string; iconId: number; level: number;
@@ -17,7 +18,7 @@ export type Snapshot = {
     mastery?: { id: number; lv: number; pt: number }[];
     mByChamp?: Record<string, number>;
   };
-  friends?: { name: string; sid: number; avail: string; note?: string; icon?: number; status?: string }[];
+  friends?: { name: string; sid: number; avail: string; note?: string; icon?: number; status?: string; id?: string }[];
   icons?: number[];
   loot?: { blue: number; orange: number; mythic: number; rp: number; champShards: { n: number; value: number }; skinShards: { n: number; value: number }; chests: number; keys: number };
   autoAccept?: boolean;

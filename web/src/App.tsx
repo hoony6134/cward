@@ -27,6 +27,7 @@ function notify(title: string, body: string) {
 export default function App() {
   const { snap, status, paired, send } = useRelay(RELAY);
   const [ready, setReady] = useState(false);
+  const [drawer, setDrawer] = useState(false);
   useEffect(() => { (async () => { await loadDDragonVersion(); await Promise.all([loadChampions(), loadSummonerSpells(), loadItemHaste(), loadRunes()]); setReady(true); })(); }, []);
 
   // Notify on queue pop (match found) even when the tab is backgrounded.
@@ -55,8 +56,11 @@ export default function App() {
         {kind === 'ingame' && <span className="ml-auto font-mono text-xl tabular-nums text-[var(--gold-br)]">{fmtClock(snap!.game?.time ?? 0)}</span>}
         <NotifBell className={kind === 'ingame' ? '' : 'ml-auto'} />
         <Dot status={status} />
+        <button onClick={() => setDrawer(true)} aria-label="메뉴" className="text-[var(--gold)] text-xl leading-none px-1">☰</button>
         </header>
       </div>
+
+      {drawer && snap && <MoreDrawer snap={snap} send={send} ready={ready} onClose={() => setDrawer(false)} />}
 
       <div className="enter" key={kind}>
         {!snap ? <Loading />
@@ -65,7 +69,8 @@ export default function App() {
           : kind === 'lobby' ? <Lobby snap={snap} ready={ready} send={send} />
           : kind === 'readycheck' ? <ReadyCheck send={send} />
           : kind === 'searching' ? <Searching snap={snap} send={send} />
-          : kind === 'menu' ? <Menu snap={snap} send={send} ready={ready} />
+          : kind === 'menu' ? <Menu snap={snap} send={send} />
+          : kind === 'postgame' ? <PostGame snap={snap} ready={ready} send={send} />
           : <Waiting status={status} clientOff={kind === 'off' || kind === 'idle'} phase={snap.phase} />}
       </div>
 
@@ -76,7 +81,7 @@ export default function App() {
 
 function headerLabel(snap: Snapshot | null) {
   if (!snap) return '';
-  return ({ ingame: '', lobby: '로비', champselect: '챔피언 선택', readycheck: '수락', searching: '매칭 중', menu: '메뉴' } as Record<string, string>)[snap.kind || ''] || '';
+  return ({ ingame: '', lobby: '로비', champselect: '챔피언 선택', readycheck: '수락', searching: '매칭 중', menu: '메뉴', postgame: '게임 종료' } as Record<string, string>)[snap.kind || ''] || '';
 }
 
 function Dot({ status }: { status: string }) {
@@ -332,15 +337,10 @@ function ModePicker({ snap, send }: { snap: Snapshot; send: (c: Command) => void
 }
 
 // Client open at main menu (no lobby yet): pick a mode to create a lobby from the phone.
-function Menu({ snap, send, ready }: { snap: Snapshot; send: (c: Command) => void; ready: boolean }) {
-  const [iconOpen, setIconOpen] = useState(false);
+function Menu({ snap, send }: { snap: Snapshot; send: (c: Command) => void }) {
   return (
     <main className="px-3 space-y-3 mt-3">
-      <ProfilePanel me={snap.me} ready={ready} onEditIcon={() => setIconOpen(true)} />
       <ModePicker snap={snap} send={send} />
-      {snap.loot && <LootPanel loot={snap.loot} send={send} />}
-      {iconOpen && <IconPickerModal icons={snap.icons || []} current={snap.me?.iconId || 0} ready={ready}
-        onClose={() => setIconOpen(false)} onPick={(id) => { send({ cmd: 'setIcon', iconId: id }); setIconOpen(false); }} />}
     </main>
   );
 }
@@ -379,6 +379,24 @@ function IconPickerModal({ icons, current, ready, onClose, onPick }: { icons: nu
   );
 }
 
+// Hamburger drawer: profile, loot, friends — cross-phase utilities out of the main view.
+function MoreDrawer({ snap, send, ready, onClose }: { snap: Snapshot; send: (c: Command) => void; ready: boolean; onClose: () => void }) {
+  const [iconOpen, setIconOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  return (
+    <div className="fixed inset-0 z-20 bg-black/70 flex items-end" onClick={onClose}>
+      <div className="panel w-full p-4 max-h-[88dvh] overflow-y-auto space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between"><h2 className="panel-title">메뉴</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
+        <ProfilePanel me={snap.me} ready={ready} onEditIcon={() => setIconOpen(true)} />
+        <button onClick={() => setFriendsOpen(true)} className="btn btn-ghost w-full py-2 text-sm">친구 초대 · 메시지</button>
+        {snap.loot && <LootPanel loot={snap.loot} send={send} />}
+        {iconOpen && <IconPickerModal icons={snap.icons || []} current={snap.me?.iconId || 0} ready={ready} onClose={() => setIconOpen(false)} onPick={(id) => { send({ cmd: 'setIcon', iconId: id }); setIconOpen(false); }} />}
+        {friendsOpen && <FriendsModal friends={snap.friends || []} ready={ready} onClose={() => setFriendsOpen(false)} onInvite={(sid) => send({ cmd: 'inviteFriend', summonerId: sid })} send={send} />}
+      </div>
+    </div>
+  );
+}
+
 function ProfilePanel({ me, ready, onEditIcon }: { me: Snapshot['me']; ready: boolean; onEditIcon?: () => void }) {
   if (!me) return null;
   return (
@@ -410,7 +428,7 @@ function ProfilePanel({ me, ready, onEditIcon }: { me: Snapshot['me']; ready: bo
   );
 }
 
-function FriendsModal({ friends, ready, onClose, onInvite }: { friends: { name: string; sid: number; avail: string; note?: string; icon?: number; status?: string }[]; ready: boolean; onClose: () => void; onInvite: (sid: number) => void }) {
+function FriendsModal({ friends, ready, onClose, onInvite, send }: { friends: { name: string; sid: number; avail: string; note?: string; icon?: number; status?: string; id?: string }[]; ready: boolean; onClose: () => void; onInvite: (sid: number) => void; send: (c: Command) => void }) {
   const [sent, setSent] = useState<Set<number>>(new Set());
   const color = (a: string) => (a === 'chat' || a === 'online' ? 'bg-[var(--blue)]' : a === 'dnd' ? 'bg-[var(--red)]' : a === 'mobile' ? 'bg-sky-400' : 'bg-[var(--gold)]');
   return (
@@ -428,6 +446,8 @@ function FriendsModal({ friends, ready, onClose, onInvite }: { friends: { name: 
                 <div className="truncate text-sm">{f.name}{f.note ? <span className="text-[var(--muted)] text-xs"> · {f.note}</span> : ''}</div>
                 {f.status ? <div className="truncate text-[11px] text-[var(--muted)]">{f.status}</div> : null}
               </div>
+              {f.id && <button onClick={() => { const t = prompt(`${f.name}에게 보낼 메시지`); if (t && confirm('메시지를 보낼까요?')) send({ cmd: 'chatSend', to: f.id, text: t }); }}
+                className="btn btn-ghost text-xs px-2 py-1 shrink-0">메시지</button>}
               <button disabled={sent.has(f.sid)} onClick={() => { onInvite(f.sid); setSent((s) => new Set(s).add(f.sid)); }}
                 className="btn btn-ghost text-xs px-3 py-1 disabled:opacity-40 shrink-0">{sent.has(f.sid) ? '초대됨' : '초대'}</button>
             </li>
@@ -443,10 +463,8 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
   const [spellPick, setSpellPick] = useState<{ slot: number } | null>(null);
   const [skinPick, setSkinPick] = useState<{ slot: number } | null>(null);
   const [runePick, setRunePick] = useState<{ slot: number } | null>(null);
-  const [friendsOpen, setFriendsOpen] = useState(false);
   return (
     <main className="px-3 space-y-3 mt-3">
-      <ProfilePanel me={snap.me} ready={ready} />
       <ModePicker snap={snap} send={send} />
 
       {snap.quickPlay && snap.slots?.length ? (
@@ -531,7 +549,6 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
             </li>
           ))}
         </ul>
-        <button onClick={() => setFriendsOpen(true)} className="btn btn-ghost w-full py-2 text-sm">친구 초대</button>
       </Panel>
 
       <button onClick={() => send({ cmd: 'startQueue' })} className="btn btn-blue w-full py-3 font-bold text-lg font-hud tracking-wide">대전 찾기</button>
@@ -551,7 +568,6 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
         <RuneEditorModal current={snap.slots[runePick.slot].perks ?? null} onClose={() => setRunePick(null)}
           onApply={(perkIds, perkStyle, perkSubStyle) => { send({ cmd: 'setSlotPerks', index: runePick.slot, perkIds, perkStyle, perkSubStyle }); setRunePick(null); }} />
       )}
-      {friendsOpen && <FriendsModal friends={snap.friends || []} ready={ready} onClose={() => setFriendsOpen(false)} onInvite={(sid) => send({ cmd: 'inviteFriend', summonerId: sid })} />}
     </main>
   );
 }
@@ -938,6 +954,29 @@ function ReadyCheck({ send }: { send: (c: Command) => void }) {
       <p className="text-sm text-[var(--blue)]">자동 수락됨 ✓</p>
       <button onClick={() => send({ cmd: 'acceptReady' })} className="btn btn-blue w-full max-w-xs py-4 font-bold text-xl font-hud">수락</button>
       <button onClick={() => send({ cmd: 'declineReady' })} className="btn btn-danger w-full max-w-xs py-2">거절</button>
+    </main>
+  );
+}
+
+function PostGame({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c: Command) => void }) {
+  const [honored, setHonored] = useState(false);
+  const allies = snap.ballot?.allies ?? [];
+  return (
+    <main className="px-3 space-y-3 mt-3">
+      <Panel title="명예 평가">
+        {allies.length ? (
+          <ul className="space-y-2">
+            {allies.map((p) => (
+              <li key={p.sid || p.puuid} className="flex items-center gap-2">
+                {ready && p.champId ? <ChampImg id={p.champId} className="w-8 h-8 rounded" /> : <span className="w-8 h-8 rounded bg-[#122235] block" />}
+                <span className="flex-1 truncate text-sm">{p.name || '소환사'}</span>
+                <button disabled={honored} onClick={() => { send({ cmd: 'honor', sid: p.sid, puuid: p.puuid }); setHonored(true); }}
+                  className="btn btn-gold text-xs px-3 py-1 disabled:opacity-40">{honored ? '완료' : '명예'}</button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-[var(--muted)]">명예 평가 대상이 없어요.</p>}
+      </Panel>
     </main>
   );
 }

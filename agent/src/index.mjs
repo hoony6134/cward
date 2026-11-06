@@ -69,7 +69,7 @@ async function tick() {
           s.recSets = await ensureRecSets(s.championId, s.position, lob.mapId);
         }
         logKind('lobby');
-        relay.send({ ...lob, me, autoAccept, recPos, owned: await ensureOwned(), friends: await getFriends() });
+        relay.send({ ...lob, me, autoAccept, recPos, owned: await ensureOwned(), friends: await getFriends(), icons: await ensureIcons(), loot: await getLoot() });
       } else if (phase === 'Matchmaking') {
         const s = await lcuGet(lcu, '/lol-matchmaking/v1/search').catch(() => ({}));
         logKind('searching');
@@ -78,6 +78,11 @@ async function tick() {
         if (autoAccept) lcuPost(lcu, '/lol-matchmaking/v1/ready-check/accept').catch(() => {});
         logKind('ready-check' + (autoAccept ? ' (auto-accept)' : ''));
         relay.send({ kind: 'readycheck', t: Date.now(), phase, me, autoAccept });
+      } else if (phase === 'PreEndOfGame' || phase === 'EndOfGame') {
+        const b = await lcuGet(lcu, '/lol-honor-v2/v1/ballot').catch(() => null);
+        const allies = (b?.eligibleAllies || b?.eligiblePlayers || []).map((p) => ({ sid: p.summonerId, puuid: p.puuid, name: p.summonerName || p.gameName || '', champId: p.championId || p.championName }));
+        logKind('postgame');
+        relay.send({ kind: 'postgame', t: Date.now(), phase, me, ballot: b ? { gameId: b.gameId, allies } : null });
       } else {
         // Client open at the main menu (None) or other non-lobby state: offer mode select.
         await ensureQueues();
@@ -173,7 +178,7 @@ async function getLoot() {
 async function getFriends() {
   const fr = await lcuGet(lcu, '/lol-chat/v1/friends').catch(() => []);
   return fr.filter((f) => f.availability && f.availability !== 'offline' && f.summonerId)
-    .map((f) => ({ name: f.gameName || f.name || '', sid: f.summonerId, avail: f.availability, note: f.note || '', icon: f.icon > 0 ? f.icon : 0, status: f.statusMessage || '' }))
+    .map((f) => ({ name: f.gameName || f.name || '', sid: f.summonerId, avail: f.availability, note: f.note || '', icon: f.icon > 0 ? f.icon : 0, status: f.statusMessage || '', id: f.id }))
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 }
 
@@ -213,6 +218,15 @@ async function runCommand({ cmd, ...a }) {
       return;
     }
     case 'dodge':         return void (await lcuPost(lcu, `/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call&args=${encodeURIComponent(JSON.stringify(['', 'teambuilder-draft', 'quitV2', '']))}`));
+    case 'honor': {       // post-game honor a teammate
+      const cfg = await lcuGet(lcu, '/lol-honor-v2/v1/config').catch(() => null);
+      const honorType = cfg?.honorCategories?.[0] || 'HEART';
+      const b = await lcuGet(lcu, '/lol-honor-v2/v1/ballot').catch(() => ({}));
+      try { await lcuPost(lcu, '/lol-honor-v2/v1/honor-player', { summonerId: a.sid, puuid: a.puuid, honorType, gameId: b.gameId }); }
+      catch { await lcuPost(lcu, '/lol-honor-v2/v1/honor', { honorCategory: honorType, summonerId: a.sid, recipientPuuid: a.puuid, ballotId: b.gameId }).catch(() => {}); }
+      return;
+    }
+    case 'chatSend':      return void (await lcuPost(lcu, `/lol-chat/v1/conversations/${encodeURIComponent(a.to)}/messages`, { body: a.text, type: 'chat' }));
     case 'startQueue':    return void (await lcuPost(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
     case 'stopQueue':     return void (await lcuDelete(lcu, '/lol-lobby/v2/lobby/matchmaking/search'));
     case 'acceptReady':   return void (await lcuPost(lcu, '/lol-matchmaking/v1/ready-check/accept'));

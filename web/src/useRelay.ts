@@ -16,7 +16,7 @@ export type Snapshot = {
     rank?: { tier: string; div: string; lp: number; w: number; l: number } | null;
     mastery?: { id: number; lv: number; pt: number }[];
   };
-  friends?: { name: string; sid: number; avail: string }[];
+  friends?: { name: string; sid: number; avail: string; note?: string; icon?: number; status?: string }[];
   autoAccept?: boolean;
   recPos?: Record<string, string[]>; // championId -> Riot recommended lanes
   // in-game

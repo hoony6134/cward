@@ -150,7 +150,7 @@ async function getMe() {
 async function getFriends() {
   const fr = await lcuGet(lcu, '/lol-chat/v1/friends').catch(() => []);
   return fr.filter((f) => f.availability && f.availability !== 'offline' && f.summonerId)
-    .map((f) => ({ name: f.gameName || f.name || '', sid: f.summonerId, avail: f.availability }))
+    .map((f) => ({ name: f.gameName || f.name || '', sid: f.summonerId, avail: f.availability, note: f.note || '', icon: f.icon > 0 ? f.icon : 0, status: f.statusMessage || '' }))
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 }
 

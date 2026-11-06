@@ -347,6 +347,11 @@ function ProfilePanel({ me, ready }: { me: Snapshot['me']; ready: boolean }) {
   if (!me) return null;
   return (
     <Panel title="내 정보">
+      <div className="flex items-center gap-2 mb-1.5">
+        {ready && me.iconId > 0 ? <img src={profileIcon(me.iconId)} className="w-7 h-7 rounded-full ring-1 ring-[var(--gold-dim)]" /> : <span className="w-7 h-7 rounded-full bg-[#122235] block" />}
+        <span className="text-sm font-medium truncate">{me.name}</span>
+        <span className="text-xs text-[var(--muted)]">Lv {me.level}</span>
+      </div>
       <div className="flex items-center justify-between">
         <span className="text-sm">
           {me.rank ? <><b className="text-[var(--gold)]">{me.rank.tier} {me.rank.div}</b> <span className="text-[var(--muted)]">{me.rank.lp}LP · {me.rank.w}승 {me.rank.l}패</span></>
@@ -367,7 +372,7 @@ function ProfilePanel({ me, ready }: { me: Snapshot['me']; ready: boolean }) {
   );
 }
 
-function FriendsModal({ friends, onClose, onInvite }: { friends: { name: string; sid: number; avail: string }[]; onClose: () => void; onInvite: (sid: number) => void }) {
+function FriendsModal({ friends, ready, onClose, onInvite }: { friends: { name: string; sid: number; avail: string; note?: string; icon?: number; status?: string }[]; ready: boolean; onClose: () => void; onInvite: (sid: number) => void }) {
   const [sent, setSent] = useState<Set<number>>(new Set());
   const color = (a: string) => (a === 'chat' || a === 'online' ? 'bg-[var(--blue)]' : a === 'dnd' ? 'bg-[var(--red)]' : a === 'mobile' ? 'bg-sky-400' : 'bg-[var(--gold)]');
   return (
@@ -376,11 +381,17 @@ function FriendsModal({ friends, onClose, onInvite }: { friends: { name: string;
         <div className="flex items-center justify-between mb-2"><h2 className="panel-title">친구 초대 · 접속 중</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
         <ul className="overflow-y-auto divide-y divide-[color:var(--line)]">
           {friends.length ? friends.map((f) => (
-            <li key={f.sid} className="flex items-center gap-2 py-2">
-              <span className={`w-2 h-2 rounded-full ${color(f.avail)}`} />
-              <span className="truncate flex-1 text-sm">{f.name}</span>
+            <li key={f.sid} className="flex items-center gap-2.5 py-2">
+              <div className="relative shrink-0">
+                {ready && f.icon ? <img src={profileIcon(f.icon)} className="w-8 h-8 rounded-full" /> : <span className="w-8 h-8 rounded-full bg-[#122235] block" />}
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-[#0b1a2c] ${color(f.avail)}`} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm">{f.name}{f.note ? <span className="text-[var(--muted)] text-xs"> · {f.note}</span> : ''}</div>
+                {f.status ? <div className="truncate text-[11px] text-[var(--muted)]">{f.status}</div> : null}
+              </div>
               <button disabled={sent.has(f.sid)} onClick={() => { onInvite(f.sid); setSent((s) => new Set(s).add(f.sid)); }}
-                className="btn btn-ghost text-xs px-3 py-1 disabled:opacity-40">{sent.has(f.sid) ? '초대됨' : '초대'}</button>
+                className="btn btn-ghost text-xs px-3 py-1 disabled:opacity-40 shrink-0">{sent.has(f.sid) ? '초대됨' : '초대'}</button>
             </li>
           )) : <li className="text-sm text-[var(--muted)] py-4 text-center">접속 중인 친구가 없어요</li>}
         </ul>
@@ -505,7 +516,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
         <RuneEditorModal current={snap.slots[runePick.slot].perks ?? null} onClose={() => setRunePick(null)}
           onApply={(perkIds, perkStyle, perkSubStyle) => { send({ cmd: 'setSlotPerks', index: runePick.slot, perkIds, perkStyle, perkSubStyle }); setRunePick(null); }} />
       )}
-      {friendsOpen && <FriendsModal friends={snap.friends || []} onClose={() => setFriendsOpen(false)} onInvite={(sid) => send({ cmd: 'inviteFriend', summonerId: sid })} />}
+      {friendsOpen && <FriendsModal friends={snap.friends || []} ready={ready} onClose={() => setFriendsOpen(false)} onInvite={(sid) => send({ cmd: 'inviteFriend', summonerId: sid })} />}
     </main>
   );
 }

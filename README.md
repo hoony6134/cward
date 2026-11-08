@@ -33,9 +33,11 @@ npx wrangler pages deploy dist --project-name ward
 
 ```bash
 cd agent && npm install
-cp .env.example .env   # RELAY_WS_URL, ROOM, ROOM_TOKEN 채우기 (ROOM은 아무 비밀 문자열, TOKEN은 1번과 동일)
+npm run init   # 새 방(ROOM)을 자동 생성하고, 묻는 자리에 ROOM_TOKEN(1번에서 넣은 값)만 붙여넣기
 npm start
 ```
+
+> 친구에게 줄 때: 이 레포 주소 + `ROOM_TOKEN` 값만 따로 알려주면 됩니다. 친구는 위 3·4단계만 하면 되고(`npm run init` 이 각자 다른 방을 만들어 줍니다), 토큰은 공개 레포에 올리지 마세요(`.env` 는 이미 gitignore).
 
 ## 4. 폰 페어링
 

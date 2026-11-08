@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "init": "node init.mjs",
     "start": "node --env-file=.env src/index.mjs",
     "test": "node ../shared/snapshot.test.mjs",
     "qr": "node qr.mjs"

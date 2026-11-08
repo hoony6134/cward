@@ -383,6 +383,7 @@ function IconPickerModal({ icons, current, ready, onClose, onPick }: { icons: nu
 function MoreDrawer({ snap, send, ready, onClose }: { snap: Snapshot; send: (c: Command) => void; ready: boolean; onClose: () => void }) {
   const [iconOpen, setIconOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [flash, setFlash] = useState(getFlashSlot());
   // Show only one sheet at a time (nested sheets look broken).
   if (iconOpen) return <IconPickerModal icons={snap.icons || []} current={snap.me?.iconId || 0} ready={ready} onClose={() => setIconOpen(false)} onPick={(id) => { send({ cmd: 'setIcon', iconId: id }); setIconOpen(false); }} />;
   if (friendsOpen) return <FriendsModal friends={snap.friends || []} ready={ready} onClose={() => setFriendsOpen(false)} onInvite={(sid) => send({ cmd: 'inviteFriend', summonerId: sid })} send={send} />;
@@ -392,6 +393,18 @@ function MoreDrawer({ snap, send, ready, onClose }: { snap: Snapshot; send: (c: 
         <div className="flex items-center justify-between"><h2 className="panel-title">메뉴</h2><button onClick={onClose} className="text-[var(--muted)] text-sm">닫기</button></div>
         <ProfilePanel me={snap.me} ready={ready} onEditIcon={() => setIconOpen(true)} />
         <button onClick={() => setFriendsOpen(true)} className="btn btn-ghost w-full py-2 text-sm">친구 초대 · 메시지</button>
+        <Panel title="설정">
+          <div className="flex items-center justify-between">
+            <span className="text-sm">점멸 위치</span>
+            <div className="flex gap-1">
+              {(['D', 'F'] as const).map((s) => (
+                <button key={s} onClick={() => { setFlashSlot(s); setFlash(s); }}
+                  className={`px-3 py-1 rounded text-sm font-bold ${flash === s ? 'bg-[var(--gold)]/20 ring-2 ring-[var(--gold)]' : 'btn btn-ghost'}`}>{s}</button>
+              ))}
+            </div>
+          </div>
+          <p className="text-[11px] text-[var(--muted)] mt-1">프리셋·스펠 적용 시 점멸이 항상 이 슬롯으로 들어갑니다.</p>
+        </Panel>
         {snap.loot && <LootPanel loot={snap.loot} />}
       </div>
     </div>
@@ -525,7 +538,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
                     {s.recSets?.map((set, si) => {
                       const on = sameRunes(s.perks, set);
                       return (
-                        <button key={si} onClick={() => send({ cmd: 'applyRecommendedSet', index: i, perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle, spell1: set.spells[0], spell2: set.spells[1] })}
+                        <button key={si} onClick={() => send({ cmd: 'applyRecommendedSet', index: i, perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle, ...flashOrder(set.spells[0], set.spells[1]) })}
                           className={`flex items-center gap-0.5 px-1.5 py-1 rounded ${on ? 'bg-[var(--gold)]/20 ring-2 ring-[var(--gold)]' : 'btn btn-ghost'}`}>
                           {set.keyIcon ? <img src={set.keyIcon} className="w-5 h-5" /> : <span className="skeleton w-5 h-5 rounded-full" />}
                           {ready && set.spells.map((sp, j) => sp ? <img key={j} src={sumSpellIcon(sp)} className="w-3.5 h-3.5 rounded-sm" /> : null)}
@@ -567,7 +580,7 @@ function Lobby({ snap, ready, send }: { snap: Snapshot; ready: boolean; send: (c
         onPick={(championId) => { send({ cmd: 'setSlotChampion', index: pick.slot, championId }); setPick(null); }} />}
       {spellPick && snap.slots?.[spellPick.slot] && (
         <SpellPickerModal current={[snap.slots[spellPick.slot].spell1, snap.slots[spellPick.slot].spell2]} onClose={() => setSpellPick(null)}
-          onPick={(spell1, spell2) => send({ cmd: 'setSlotSpells', index: spellPick.slot, spell1, spell2 })} />
+          onPick={(spell1, spell2) => send({ cmd: 'setSlotSpells', index: spellPick.slot, ...flashOrder(spell1, spell2) })} />
       )}
       {skinPick && snap.slots?.[skinPick.slot] && (
         <SkinPickerModal skins={snap.slots[skinPick.slot].skins || []} current={snap.slots[skinPick.slot].skinId}
@@ -705,7 +718,7 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
             {mine.recSets?.map((set, si) => {
               const on = sameRunes(mine.perks, set);
               return (
-                <button key={si} onClick={() => { send({ cmd: 'applyRunePage', perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle }); if (set.spells[0] && set.spells[1]) send({ cmd: 'csSelect', spell1: set.spells[0], spell2: set.spells[1] }); }}
+                <button key={si} onClick={() => { send({ cmd: 'applyRunePage', perkIds: set.perkIds, perkStyle: set.perkStyle, perkSubStyle: set.perkSubStyle }); if (set.spells[0] && set.spells[1]) send({ cmd: 'csSelect', ...flashOrder(set.spells[0], set.spells[1]) }); }}
                   className={`flex items-center gap-0.5 px-1.5 py-1 rounded ${on ? 'bg-[var(--gold)]/20 ring-2 ring-[var(--gold)]' : 'btn btn-ghost'}`}>
                   {set.keyIcon ? <img src={set.keyIcon} className="w-5 h-5" /> : <span className="skeleton w-5 h-5 rounded-full" />}
                   {ready && set.spells.map((sp, j) => sp ? <img key={j} src={sumSpellIcon(sp)} className="w-3.5 h-3.5 rounded-sm" /> : null)}
@@ -720,7 +733,7 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
         className="btn btn-danger w-full py-2 text-sm">나가기 (닷지)</button>
 
       {spellPick && mine && <SpellPickerModal current={[mine.spell1, mine.spell2]} onClose={() => setSpellPick(false)}
-        onPick={(spell1, spell2) => send({ cmd: 'csSelect', spell1, spell2 })} />}
+        onPick={(spell1, spell2) => send({ cmd: 'csSelect', ...flashOrder(spell1, spell2) })} />}
       {skinPick && mine && <SkinPickerModal skins={mine.skins || []} current={mine.skinId} champKey={champ(mine.championId)?.key || ''}
         onClose={() => setSkinPick(false)} onPick={(skinId) => { send({ cmd: 'csSelect', skinId }); setSkinPick(false); }} />}
       {runePick && mine && <RuneEditorModal current={mine.perks ?? null} onClose={() => setRunePick(false)}
@@ -779,6 +792,17 @@ function ChampGrid({ pool, ready, sel, onTap }: { pool: number[]; ready: boolean
 const favKey = (pos: string) => `ward:fav:${pos || 'ANY'}`;
 function getFav(pos: string): number[] { try { return JSON.parse(localStorage.getItem(favKey(pos)) || '[]'); } catch { return []; } }
 function setFav(pos: string, ids: number[]) { try { localStorage.setItem(favKey(pos), JSON.stringify(ids)); } catch { /* ignore */ } }
+
+// Global preference: which slot Flash goes in (spell1=D, spell2=F). Applied to every
+// spell the app sets, so presets and the spell picker always keep Flash where you want it.
+const FLASH = 4;
+export function getFlashSlot(): 'D' | 'F' { try { return localStorage.getItem('ward:flashSlot') === 'F' ? 'F' : 'D'; } catch { return 'D'; } }
+export function setFlashSlot(s: 'D' | 'F') { try { localStorage.setItem('ward:flashSlot', s); } catch { /* ignore */ } }
+function flashOrder(spell1: number, spell2: number): { spell1: number; spell2: number } {
+  if (spell1 !== FLASH && spell2 !== FLASH) return { spell1, spell2 };
+  const other = spell1 === FLASH ? spell2 : spell1;
+  return getFlashSlot() === 'D' ? { spell1: FLASH, spell2: other } : { spell1: other, spell2: FLASH };
+}
 
 // Full-roster picker (for Swiftplay slots): all champions + per-lane favorites + Riot's lane recommendations.
 function ChampPickerModal({ lane, recPos, owned, mByChamp, onClose, onPick }: { lane: string; recPos?: Record<string, string[]>; owned?: number[]; mByChamp?: Record<string, number>; onClose: () => void; onPick: (id: number) => void }) {

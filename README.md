@@ -39,6 +39,19 @@ npm start
 
 > 친구에게 줄 때: 이 레포 주소만 알려주면 됩니다. 친구는 위 3·4단계만 하면 되고, `npm run init` 이 각자 다른 방·토큰을 만들어 줍니다(공유할 비밀 없음). 다른 릴레이를 쓸 거면 `RELAY_WS_URL=... npm run init`.
 
+### 친구용: 바이너리 다운로드 (Node 설치 불필요)
+
+[Releases](../../releases) 에서 OS에 맞는 파일을 받아 실행하면 끝 — 첫 실행 때 방·토큰이 자동 생성되고(`ward.config.json`), 폰 연결 QR이 콘솔에 뜹니다. 게임 전엔 그 파일만 다시 실행.
+
+- **Windows**: `ward-agent-windows-x64.exe` 더블클릭. "Windows의 PC 보호" 경고 → **추가 정보 → 실행**.
+- **macOS** (서명 없는 파일이라 격리 해제 필요, Intel 맥은 `-x64`):
+  ```bash
+  xattr -dr com.apple.quarantine ~/Downloads/ward-agent-macos-arm64
+  chmod +x ~/Downloads/ward-agent-macos-arm64 && ~/Downloads/ward-agent-macos-arm64
+  ```
+
+> 릴리스 자동화: `git tag v1.0.0 && git push --tags` 하면 GitHub Actions(`.github/workflows/release.yml`)가 위 바이너리들을 빌드해 Release에 올립니다.
+
 ## 4. 폰 페어링
 
 터미널에서 한 번만 치면 QR + 링크가 뜹니다(토큰이 localStorage에 저장돼 다음부터 자동 연결):

@@ -1,0 +1,28 @@
+# Tag a release (git tag v1.0.0 && git push --tags) → builds standalone agent
+# binaries for Windows and macOS and attaches them to the GitHub Release.
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+        working-directory: agent
+      - name: Build binaries
+        working-directory: agent
+        run: |
+          mkdir -p dist
+          bun build src/index.mjs --compile --target=bun-windows-x64 --outfile dist/ward-agent-windows-x64.exe
+          bun build src/index.mjs --compile --target=bun-darwin-arm64 --outfile dist/ward-agent-macos-arm64
+          bun build src/index.mjs --compile --target=bun-darwin-x64  --outfile dist/ward-agent-macos-x64
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: agent/dist/ward-agent-*

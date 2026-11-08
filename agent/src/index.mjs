@@ -6,12 +6,11 @@ import { shapeLobby, shapeChampSelect, filterQueues, cdragonAsset } from '../../
 import { getAllGameData } from './liveclient.mjs';
 import { discoverLCU, lcuGet, lcuPost, lcuPatch, lcuPut, lcuDelete } from './lcu.mjs';
 import { createRelay } from './relay.mjs';
+import { loadConfig, printPairing } from './config.mjs';
 
-const { RELAY_WS_URL, ROOM, ROOM_TOKEN, POLL_MS = '1500', IDLE_POLL_MS = '2000' } = process.env;
-if (!RELAY_WS_URL || !ROOM || !ROOM_TOKEN) {
-  console.error('Missing config. Set RELAY_WS_URL, ROOM, ROOM_TOKEN (see .env.example).');
-  process.exit(1);
-}
+const cfg = loadConfig();
+const { relay: RELAY_WS_URL, room: ROOM, token: ROOM_TOKEN } = cfg;
+const { POLL_MS = '1500', IDLE_POLL_MS = '2000' } = process.env;
 const pollMs = Number(POLL_MS);
 const idleMs = Number(IDLE_POLL_MS);
 
@@ -31,6 +30,7 @@ const relay = createRelay({
   onCommand: (c) => runCommand(c).catch((e) => console.log('[cmd] failed:', c.cmd, e.message)).finally(refreshSoon),
 });
 console.log(`[agent] room=${ROOM}`);
+printPairing(cfg);
 
 const logKind = (k) => { if (k !== lastKind) { console.log('[agent]', k); lastKind = k; } };
 

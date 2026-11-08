@@ -57,6 +57,7 @@ export type Snapshot = {
   myTeam?: Cell[]; theirTeam?: Cell[];
   bans?: { mine: number[]; theirs: number[] };
   pickable?: number[]; bannable?: number[];
+  subset?: number[]; // 아수라장/Brawl: the few champions offered to pick from
   benchEnabled?: boolean; bench?: number[]; rerolls?: number;
   trades?: { id: number; cellId: number; state: string }[];
   mine?: { championId: number; skinId: number; spell1: number; spell2: number; skins?: { id: number; name: string; base?: boolean; chroma?: boolean; color?: string }[]; perks?: { perkIds: number[]; perkStyle: number; perkSubStyle: number } | null; recSets?: { keyIcon: string; perkIds: number[]; perkStyle: number; perkSubStyle: number; spells: number[] }[] } | null;

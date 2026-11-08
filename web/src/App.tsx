@@ -661,8 +661,8 @@ function ChampSelect({ snap, ready, send }: { snap: Snapshot; ready: boolean; se
       <Bans mine={snap.bans?.mine ?? []} theirs={snap.bans?.theirs ?? []} ready={ready} />
 
       {action ? (
-        <Panel title={isBan ? '챔피언 밴' : '챔피언 선택'}>
-          <ChampGrid pool={(isBan ? snap.bannable : snap.pickable) ?? []} ready={ready} sel={sel}
+        <Panel title={isBan ? '챔피언 밴' : (snap.subset?.length ? '챔피언 선택 (제공된 챔피언)' : '챔피언 선택')}>
+          <ChampGrid pool={isBan ? (snap.bannable ?? []) : (snap.subset?.length ? snap.subset : (snap.pickable ?? []))} ready={ready} sel={sel}
             onTap={(id) => { setSel(id); send({ cmd: isBan ? 'ban' : 'pick', championId: id, lock: false }); }} />
           <button disabled={!sel} onClick={() => send({ cmd: isBan ? 'ban' : 'pick', championId: sel, lock: true })}
             className={`btn w-full mt-3 py-3 font-bold font-hud ${isBan ? 'btn-danger' : 'btn-blue'} disabled:opacity-40`}>{isBan ? '밴 확정' : '픽 확정'}</button>

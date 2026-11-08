@@ -56,6 +56,10 @@ async function tick() {
           lcuGet(lcu, '/lol-champ-select/v1/bannable-champion-ids').catch(() => []),
         ]);
         const snap = shapeChampSelect(session, pickable, bannable);
+        // 아수라장/Brawl: the initial "pick one of a few offered" set (empty in normal modes).
+        const subset = await lcuGet(lcu, '/lol-lobby-team-builder/champ-select/v1/subset-champion-list').catch(() => []);
+        snap.subset = (Array.isArray(subset) ? subset : []).map((x) => (typeof x === 'number' ? x : x?.championId)).filter(Boolean);
+        if (snap.subset.length) console.log('[cs] subset', snap.subset);
         lastAction = snap.myAction?.id ?? null;
         await ensureRecPos();
         if (snap.mine?.championId) {

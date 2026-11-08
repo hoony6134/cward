@@ -15,9 +15,12 @@ const open = (url) => new Promise((res, rej) => {
 
 let fails = 0;
 
-// 1. wrong token must be rejected
-try { await open(`${BASE}?room=${room}&role=viewer&token=WRONG`); console.error('✗ bad token was accepted'); fails++; }
-catch { console.log('✓ bad token rejected'); }
+// 1. first connection claims this room's token; empty or mismatched tokens are rejected
+const claimer = await open(`${BASE}?room=${room}&role=agent&token=testtoken`);
+try { await open(`${BASE}?room=${room}&role=viewer&token=`); console.error('✗ empty token was accepted'); fails++; }
+catch { console.log('✓ empty token rejected'); }
+try { await open(`${BASE}?room=${room}&role=viewer&token=WRONG`); console.error('✗ wrong token was accepted'); fails++; }
+catch { console.log('✓ wrong token rejected'); }
 
 // 2. agent -> viewer fan-out
 const viewer = await open(`${BASE}?room=${room}&role=viewer&token=testtoken`);
@@ -38,6 +41,6 @@ const lateMsg = await Promise.race([
 assert.ok(lateMsg && lateMsg.hello === 'world', 'late viewer should get last snapshot');
 console.log('✓ late viewer gets last snapshot');
 
-for (const w of [viewer, agent, late]) w.close();
+for (const w of [claimer, viewer, agent, late]) w.close();
 console.log(fails ? `FAILED (${fails})` : 'ALL OK');
 process.exit(fails ? 1 : 0);

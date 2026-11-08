@@ -4,7 +4,6 @@
 
 export interface Env {
   ROOM: DurableObjectNamespace<RelayRoom>;
-  ROOM_TOKEN: string; // shared secret, set via `wrangler secret put ROOM_TOKEN`
 }
 
 const sanitizeRoom = (r: string) => r.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
@@ -19,12 +18,11 @@ export default {
       return new Response('expected websocket', { status: 426 });
     }
     const room = sanitizeRoom(url.searchParams.get('room') || '');
-    const role = url.searchParams.get('role') === 'agent' ? 'agent' : 'viewer';
-    const token = url.searchParams.get('token') || '';
-    if (!room || !env.ROOM_TOKEN || token !== env.ROOM_TOKEN) {
+    if (!room) {
       return new Response('unauthorized', { status: 401 });
     }
-    void role; // role is read from the query inside the DO so the Upgrade header is preserved
+    // The token is a per-room shared secret between the agent and the phone, verified
+    // inside the DO (trust-on-first-use). No server-wide secret: the room id is random.
     const stub = env.ROOM.getByName(room);
     return stub.fetch(request);
   },
@@ -34,7 +32,15 @@ import { DurableObject } from 'cloudflare:workers';
 
 export class RelayRoom extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
-    const role = new URL(request.url).searchParams.get('role') === 'agent' ? 'agent' : 'viewer';
+    const url = new URL(request.url);
+    const role = url.searchParams.get('role') === 'agent' ? 'agent' : 'viewer';
+    const token = url.searchParams.get('token') || '';
+    // Trust-on-first-use: the first connector fixes this room's token; others must match.
+    const known = await this.ctx.storage.get<string>('token');
+    if (!token || (known !== undefined && token !== known)) {
+      return new Response('unauthorized', { status: 401 });
+    }
+    if (known === undefined) await this.ctx.storage.put('token', token);
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     // Tag the socket with its role so we can target broadcasts after hibernation.

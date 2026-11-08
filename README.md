@@ -16,9 +16,10 @@ League (:2999)  →  agent (headless, 로컬)  →  Cloudflare Worker+DO (룸 �
 ```bash
 cd worker && npm install
 npx wrangler login
-npx wrangler secret put ROOM_TOKEN   # 긴 랜덤 문자열 입력
 npm run deploy                        # 출력된 https://...workers.dev 주소 확인
 ```
+
+> 서버 시크릿은 없습니다. 토큰은 방마다 agent↔폰이 1:1로 맞추는 공유 비밀이고, 각 방의 토큰은 **처음 접속한 쪽이 고정**합니다(방 id는 랜덤이라 추측 불가).
 
 ## 2. 폰 UI 배포 (web, Cloudflare Worker + 정적 에셋)
 
@@ -32,11 +33,11 @@ npm run deploy   # build 후 wrangler deploy (ward-web Worker). 도메인/라우
 
 ```bash
 cd agent && npm install
-npm run init   # 새 방(ROOM)을 자동 생성하고, 묻는 자리에 ROOM_TOKEN(1번에서 넣은 값)만 붙여넣기
+npm run init   # 새 방(ROOM)과 토큰을 랜덤 생성해 .env 작성 (입력할 것 없음)
 npm start
 ```
 
-> 친구에게 줄 때: 이 레포 주소 + `ROOM_TOKEN` 값만 따로 알려주면 됩니다. 친구는 위 3·4단계만 하면 되고(`npm run init` 이 각자 다른 방을 만들어 줍니다), 토큰은 공개 레포에 올리지 마세요(`.env` 는 이미 gitignore).
+> 친구에게 줄 때: 이 레포 주소만 알려주면 됩니다. 친구는 위 3·4단계만 하면 되고, `npm run init` 이 각자 다른 방·토큰을 만들어 줍니다(공유할 비밀 없음). 다른 릴레이를 쓸 거면 `RELAY_WS_URL=... npm run init`.
 
 ## 4. 폰 페어링
 

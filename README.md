@@ -20,13 +20,12 @@ npx wrangler secret put ROOM_TOKEN   # 긴 랜덤 문자열 입력
 npm run deploy                        # 출력된 https://...workers.dev 주소 확인
 ```
 
-## 2. 폰 UI 배포 (web, Cloudflare Pages)
+## 2. 폰 UI 배포 (web, Cloudflare Worker + 정적 에셋)
 
 ```bash
 cd web && npm install
-echo 'VITE_RELAY_WS_URL=wss://ward-relay.<서브도메인>.workers.dev/ws' > .env
-npm run build
-npx wrangler pages deploy dist --project-name ward
+echo 'VITE_RELAY_WS_URL=wss://relay.<your-domain>/ws' > .env   # 1번 Worker 주소
+npm run deploy   # build 후 wrangler deploy (ward-web Worker). 도메인/라우트는 web/wrangler.jsonc 참고
 ```
 
 ## 3. 로컬 에이전트 (agent)

@@ -25,10 +25,11 @@
     .muted { color: #8aa0b8; }
     .row { display: flex; align-items: center; gap: 6px; }
 
-    /* ---- positions ---- */
-    .left-rail { position: fixed; left: 10px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; max-height: 92vh; }
-    .build-dock { position: fixed; right: 14px; bottom: 104px; width: 300px; }
-    .top-hud { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); }
+    /* ---- positions (left/top come from inline styles so panels are draggable) ---- */
+    .left-rail { position: fixed; display: flex; flex-direction: column; gap: 8px; max-height: 92vh; }
+    .build-dock { position: fixed; width: 300px; }
+    .top-hud { position: fixed; }
+    .title { cursor: default; }
 
     /* ---- icons: never distort ---- */
     img { display: block; object-fit: cover; }

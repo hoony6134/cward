@@ -28,9 +28,38 @@ declare global {
 
 // When a panel captures clicks, the full-screen window must briefly stop ignoring
 // the mouse while the pointer is over it; otherwise clicks fall through to the game.
+let dragging = false;
 const capture = window.cward
-  ? { onPointerEnter: () => window.cward!.setMouseIgnore(false), onPointerLeave: () => window.cward!.setMouseIgnore(true) }
+  ? {
+      onPointerEnter: () => { if (!dragging) window.cward!.setMouseIgnore(false); },
+      onPointerLeave: () => { if (!dragging) window.cward!.setMouseIgnore(true); },
+    }
   : {};
+
+type Pos = { left: number; top: number };
+// Drag a panel by its title bar; position persists in localStorage. Double-click
+// the title to reset to the default spot.
+function useDraggable(key: string, def: Pos) {
+  const [pos, setPos] = useState<Pos>(() => {
+    try { const s = localStorage.getItem('cward:pos:' + key); if (s) return JSON.parse(s); } catch { /* ignore */ }
+    return def;
+  });
+  const onPointerDown = (e: { clientX: number; clientY: number; preventDefault: () => void }) => {
+    e.preventDefault();
+    dragging = true;
+    window.cward?.setMouseIgnore(false);
+    const sx = e.clientX, sy = e.clientY, base = pos;
+    const move = (ev: PointerEvent) => setPos({ left: Math.max(0, base.left + ev.clientX - sx), top: Math.max(0, base.top + ev.clientY - sy) });
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      dragging = false; window.cward?.setMouseIgnore(true);
+      setPos((p) => { try { localStorage.setItem('cward:pos:' + key, JSON.stringify(p)); } catch { /* ignore */ } return p; });
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const onDoubleClick = () => { try { localStorage.removeItem('cward:pos:' + key); } catch { /* ignore */ } setPos(def); };
+  return { style: { left: pos.left, top: pos.top } as const, handle: { onPointerDown, onDoubleClick, style: { cursor: 'move' } as const } };
+}
 
 function useNow() {
   const [, set] = useState(0);
@@ -50,9 +79,10 @@ function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean })
   const left = (k: string) => Math.max(0, Math.ceil(((until[k] || 0) - now) / 1000));
   const ah = (p: Player) => p.items.reduce((s, it) => s + itemHaste(it.id), 0);
   const rCd = (p: Player) => withHaste(ultCd[p.champKey]?.[ultRank(p.level) - 1] ?? 100, ah(p));
+  const drag = useDraggable('spell', { left: 10, top: Math.round(window.innerHeight * 0.5 - 130) });
   return (
-    <div className="card left-rail" {...capture}>
-      <div className="title">상대 스펠 · 궁 쿨</div>
+    <div className="card left-rail" style={drag.style} {...capture}>
+      <div className="title" {...drag.handle}>상대 스펠 · 궁 쿨 ⠿</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {enemies.map((p) => (
           <div className="row" key={p.riotId}>
@@ -90,9 +120,10 @@ function maxOrder(order: string[]): string[] {
 function BuildDock({ build, ready }: { build: NonNullable<Build>; ready: boolean }) {
   const wr = build.winRate != null ? ` · 승률 ${Math.round(build.winRate * 100)}%` : '';
   const items = [...(build.items?.ids ?? []), ...build.boots];
+  const drag = useDraggable('build', { left: Math.max(0, window.innerWidth - 314), top: Math.max(0, window.innerHeight - 230) });
   return (
-    <div className="card build-dock">
-      <div className="title">추천 빌드 · OP.GG ({build.mode}){wr}</div>
+    <div className="card build-dock" style={drag.style} {...capture}>
+      <div className="title" {...drag.handle}>추천 빌드 · OP.GG ({build.mode}){wr} ⠿</div>
       {items.length ? <div className="wrap" style={{ marginBottom: 8 }}>{ready && items.map((id, i) => <img key={i} className="itm" src={itemIcon(id)} />)}</div> : null}
       <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
         {build.skills.length ? (
@@ -107,9 +138,10 @@ function BuildDock({ build, ready }: { build: NonNullable<Build>; ready: boolean
 
 function TopHud({ snap }: { snap: Snapshot }) {
   const o = snap.objectives;
+  const drag = useDraggable('hud', { left: Math.round(window.innerWidth / 2 - 120), top: 12 });
   return (
-    <div className="card top-hud">
-      <div className="row" style={{ gap: 10 }}>
+    <div className="card top-hud" style={drag.style} {...capture}>
+      <div className="row" style={{ gap: 10 }} {...drag.handle}>
         <span className="clock">{fmtClock(snap.game?.time ?? 0)}</span>
         <span className="muted" style={{ fontSize: 11 }}>{snap.game?.mode ?? ''}</span>
         {snap.active && <span className="pill"><b>{snap.active.gold.toLocaleString('ko-KR')}</b> G</span>}

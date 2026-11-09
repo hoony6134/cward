@@ -37,7 +37,12 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": ["dmg"],
-      "identity": null
+      "identity": "Developer ID Application: VOID (KR) (2S9H42VJUA)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "notarize": { "teamId": "2S9H42VJUA" }
     }
   }
 }

@@ -3,11 +3,13 @@
   "private": true,
   "type": "module",
   "description": "cward macOS menu-bar app: phone pairing (no terminal) + in-game overlay",
-  "main": "src/main.mjs",
+  "main": "build/main.mjs",
   "scripts": {
+    "bundle:main": "esbuild src/main.mjs --bundle --platform=node --format=esm --packages=external --outfile=build/main.mjs && cp src/preload.cjs build/preload.cjs",
     "build:renderer": "vite build",
-    "start": "pkill -f 'ward/overlay/node_modules/electron' 2>/dev/null; sleep 0.3; vite build && electron .",
-    "dist": "vite build && electron-builder"
+    "build": "npm run bundle:main && npm run build:renderer",
+    "start": "pkill -f 'ward/overlay/node_modules/electron' 2>/dev/null; sleep 0.3; npm run build && electron .",
+    "dist": "npm run build && electron-builder"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
@@ -19,6 +21,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.6.3",
@@ -27,10 +30,11 @@
   "build": {
     "appId": "xyz.scian.cward",
     "productName": "cward",
-    "files": ["src/**", "renderer/**", "renderer-dist/**", "../agent/src/**", "../shared/**"],
+    "files": ["build/**", "renderer/**", "renderer-dist/**"],
     "mac": {
       "category": "public.app-category.utilities",
-      "target": ["dmg"]
+      "target": ["dmg"],
+      "identity": null
     }
   }
 }

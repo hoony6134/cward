@@ -163,7 +163,8 @@ function BuildDock({ build, ready, full, owned }: { build: NonNullable<Build>; r
   // In-game: clean — just the item pictures and the win rate. Whole card drags.
   if (!full) {
     return (
-      <div className="card build-clean" style={drag.style} {...capture} {...drag.handle}>
+      <div className="card build-clean" style={{ ...drag.style, cursor: 'move' }} {...capture}
+        onPointerDown={drag.handle.onPointerDown} onDoubleClick={drag.handle.onDoubleClick}>
         {ready && items.map((id, i) => <ItemPic key={i} id={id} owned={owned?.has(id)} />)}
         {wr && <span className="wr">{wr}</span>}
       </div>

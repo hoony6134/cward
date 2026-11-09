@@ -16,37 +16,26 @@ type Build = {
 
 declare global {
   interface Window {
-    cward: {
+    cward?: {
       onSnapshot: (cb: (s: Snapshot) => void) => void;
       onReco: (cb: (b: Build) => void) => void;
       onPairing: (cb: (d: { link: string; qr: string }) => void) => void;
+      setMouseIgnore: (ignore: boolean) => void;
       ready: () => void;
     };
   }
 }
 
+// When a panel captures clicks, the full-screen window must briefly stop ignoring
+// the mouse while the pointer is over it; otherwise clicks fall through to the game.
+const capture = window.cward
+  ? { onPointerEnter: () => window.cward!.setMouseIgnore(false), onPointerLeave: () => window.cward!.setMouseIgnore(true) }
+  : {};
+
 function useNow() {
   const [, set] = useState(0);
   useEffect(() => { const id = setInterval(() => set((n) => n + 1), 1000); return () => clearInterval(id); }, []);
   return Date.now();
-}
-
-function Objectives({ snap }: { snap: Snapshot }) {
-  const o = snap.objectives;
-  if (!o) return null;
-  return (
-    <div className="card">
-      <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
-        <span className="pill muted">용 <b>{o.dragons.map((d) => d.type).join('·') || '—'}</b></span>
-        {o.barons > 0 && <span className="pill muted">바론 <b>{o.barons}</b></span>}
-        {o.heralds > 0 && <span className="pill muted">전령 <b>{o.heralds}</b></span>}
-        {o.atakhan > 0 && <span className="pill muted">아타칸 <b>{o.atakhan}</b></span>}
-        <span className="pill muted" style={{ marginLeft: 'auto' }}>
-          포탑 <b style={{ color: '#5aa0e6' }}>{o.towers.ORDER}</b> · <b style={{ color: '#e06a6a' }}>{o.towers.CHAOS}</b>
-        </span>
-      </div>
-    </div>
-  );
 }
 
 function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean }) {
@@ -62,14 +51,13 @@ function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean })
   const ah = (p: Player) => p.items.reduce((s, it) => s + itemHaste(it.id), 0);
   const rCd = (p: Player) => withHaste(ultCd[p.champKey]?.[ultRank(p.level) - 1] ?? 100, ah(p));
   return (
-    <div className="card">
+    <div className="card left-rail" {...capture}>
       <div className="title">상대 스펠 · 궁 쿨</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {enemies.map((p) => (
           <div className="row" key={p.riotId}>
             {ready && <img className="champ" src={champIcon(p.champKey)} alt={p.champion} />}
-            <span className="name muted">{p.champion}</span>
-            <div className="row nodrag" style={{ gap: 4, flexWrap: 'wrap' }}>
+            <div className="wrap">
               {p.spells.map((s, i) => s?.key ? (
                 <Chip key={i} icon={ready ? spellIcon(s.key) : ''} left={left(`${p.riotId}:s${i}`)}
                   title={s.name || s.key} onClick={() => toggle(`${p.riotId}:s${i}`, spellCd(s.key))} />
@@ -99,117 +87,95 @@ function maxOrder(order: string[]): string[] {
   return ['Q', 'W', 'E'].sort((a, b) => c[b][0] - c[a][0] || c[a][1] - c[b][1]);
 }
 
-function Icons({ ids, kind, size = 26 }: { ids: number[]; kind: 'item' | 'rune'; size?: number }) {
-  return (
-    <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
-      {ids.map((id, i) => {
-        const src = kind === 'item' ? itemIcon(id) : perkIcon(id);
-        return src ? <img key={i} src={src} width={size} height={size} style={{ borderRadius: 6, border: '1px solid rgba(120,150,190,.3)' }} />
-          : <span key={i} style={{ width: size, height: size, borderRadius: 6, background: '#122235', display: 'inline-block' }} />;
-      })}
-    </div>
-  );
-}
-
-function BuildPanel({ build, ready }: { build: NonNullable<Build>; ready: boolean }) {
+function BuildDock({ build, ready }: { build: NonNullable<Build>; ready: boolean }) {
   const wr = build.winRate != null ? ` · 승률 ${Math.round(build.winRate * 100)}%` : '';
+  const items = [...(build.items?.ids ?? []), ...build.boots];
   return (
-    <div className="card nodrag">
+    <div className="card build-dock">
       <div className="title">추천 빌드 · OP.GG ({build.mode}){wr}</div>
-      {build.items?.ids?.length ? (
-        <>
-          <div className="muted" style={{ fontSize: 10, margin: '2px 0 4px' }}>코어 아이템</div>
-          {ready && <Icons ids={[...build.items.ids, ...build.boots]} kind="item" />}
-        </>
-      ) : null}
-      {build.skills.length ? (
-        <div style={{ marginTop: 8 }}>
-          <span className="muted" style={{ fontSize: 10 }}>선마 </span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#e9c877' }}>{maxOrder(build.skills).join(' › ')}</span>
-        </div>
-      ) : null}
-      {build.runes ? (
-        <div style={{ marginTop: 8 }}>
-          <div className="muted" style={{ fontSize: 10, marginBottom: 4 }}>룬</div>
-          {ready && <Icons ids={[...build.runes.primary, ...build.runes.secondary]} kind="rune" size={22} />}
-        </div>
-      ) : null}
-      {build.spells.length ? (
-        <div className="row" style={{ marginTop: 8, gap: 4 }}>
-          <span className="muted" style={{ fontSize: 10 }}>스펠</span>
-          {ready && build.spells.map((id, i) => {
-            const src = sumSpellIcon(id);
-            return src ? <img key={i} src={src} width={22} height={22} style={{ borderRadius: 5 }} /> : null;
-          })}
-        </div>
-      ) : null}
+      {items.length ? <div className="wrap" style={{ marginBottom: 8 }}>{ready && items.map((id, i) => <img key={i} className="itm" src={itemIcon(id)} />)}</div> : null}
+      <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
+        {build.skills.length ? (
+          <span><span className="muted" style={{ fontSize: 10 }}>선마 </span><b style={{ color: '#e9c877', fontSize: 12 }}>{maxOrder(build.skills).join(' › ')}</b></span>
+        ) : null}
+        {build.runes && ready ? <span className="wrap">{[...build.runes.primary.slice(0, 1), ...build.runes.secondary.slice(0, 1)].map((id, i) => <img key={i} className="rune" src={perkIcon(id)} />)}</span> : null}
+        {build.spells.length && ready ? <span className="wrap">{build.spells.map((id, i) => { const s = sumSpellIcon(id); return s ? <img key={i} className="sp" src={s} /> : null; })}</span> : null}
+      </div>
     </div>
   );
 }
 
-function Hud({ snap, ready }: { snap: Snapshot; ready: boolean }) {
-  const players = snap.players ?? [];
-  const me = players.find((p) => p.riotId === snap.active?.riotId);
-  const enemies = me ? players.filter((p) => p.team !== me.team) : players.filter((p) => p.team === 'CHAOS');
+function TopHud({ snap }: { snap: Snapshot }) {
+  const o = snap.objectives;
   return (
-    <>
-      <div className="card drag">
-        <div className="row">
-          <span className="clock">{fmtClock(snap.game?.time ?? 0)}</span>
-          <span className="muted" style={{ fontSize: 11, marginLeft: 8 }}>{snap.game?.mode ?? ''}</span>
-          {snap.active && <span className="pill" style={{ marginLeft: 'auto' }}><b>{snap.active.gold.toLocaleString('ko-KR')}</b> G</span>}
-        </div>
-      </div>
-      <Objectives snap={snap} />
-      <SpellTracker enemies={enemies} ready={ready} />
-    </>
-  );
-}
-
-function ChampSelectHead({ snap, ready }: { snap: Snapshot; ready: boolean }) {
-  const id = snap.mine?.championId;
-  const c = id ? champ(id) : null;
-  return (
-    <div className="card drag">
-      <div className="row">
-        {ready && id ? <img className="champ" src={champIconById(id)} alt={c?.name} /> : <span className="champ" style={{ background: '#122235' }} />}
-        <span style={{ fontSize: 13, fontWeight: 700 }}>{c?.name ?? '챔피언 선택'}</span>
-        <span className="muted" style={{ fontSize: 11, marginLeft: 'auto' }}>
-          {snap.timeLeft ? `${snap.timeLeft}s` : '챔프 선택'}
-        </span>
+    <div className="card top-hud">
+      <div className="row" style={{ gap: 10 }}>
+        <span className="clock">{fmtClock(snap.game?.time ?? 0)}</span>
+        <span className="muted" style={{ fontSize: 11 }}>{snap.game?.mode ?? ''}</span>
+        {snap.active && <span className="pill"><b>{snap.active.gold.toLocaleString('ko-KR')}</b> G</span>}
+        {o && <span className="pill muted">· 용 <b>{o.dragons.map((d) => d.type).join('') || '—'}</b> · 탑 <b style={{ color: '#5aa0e6' }}>{o.towers.ORDER}</b>:<b style={{ color: '#e06a6a' }}>{o.towers.CHAOS}</b></span>}
       </div>
     </div>
   );
 }
 
 function App() {
-  const [snap, setSnap] = useState<Snapshot | null>(null);
-  const [build, setBuild] = useState<Build>(null);
+  const [snap, setSnap] = useState<Snapshot | null>(demoSnap());
+  const [build, setBuild] = useState<Build>(demoBuild());
   const [ready, setReady] = useState(false);
   useEffect(() => {
     (async () => { await loadDDragonVersion(); await Promise.all([loadChampions(), loadSummonerSpells(), loadItemHaste(), loadRunes()]); setReady(true); })();
-    window.cward.onSnapshot((s) => setSnap(s));
-    window.cward.onReco((b) => setBuild(b));
-    window.cward.ready();
+    if (window.cward) {
+      setSnap(null); setBuild(null); // live mode: wait for real data
+      window.cward.onSnapshot((s) => setSnap(s));
+      window.cward.onReco((b) => setBuild(b));
+      window.cward.ready();
+    }
   }, []);
-  if (snap?.kind === 'ingame' && snap.players?.length) {
-    return (
-      <>
-        <Hud snap={snap} ready={ready} />
-        {build && <BuildPanel build={build} ready={ready} />}
-      </>
-    );
-  }
-  if (snap?.kind === 'champselect') {
-    return (
-      <>
-        <ChampSelectHead snap={snap} ready={ready} />
-        {build ? <BuildPanel build={build} ready={ready} />
-          : <div className="card idle">{snap.mine?.championId ? '빌드 불러오는 중…' : '챔피언을 고르면 추천이 떠요'}</div>}
-      </>
-    );
-  }
-  return <div className="card drag idle">cward · 대기 중{snap?.kind ? ` (${snap.kind})` : ''}</div>;
+
+  const inGame = snap && (snap.kind === 'ingame' || snap.kind === 'champselect') && (snap.players?.length || snap.kind === 'champselect');
+  if (!inGame) return <div className="idle">cward · 대기 중{snap?.kind ? ` (${snap.kind})` : ''}</div>;
+
+  const players = snap!.players ?? [];
+  const me = players.find((p) => p.riotId === snap!.active?.riotId);
+  const enemies = me ? players.filter((p) => p.team !== me.team) : players.filter((p) => p.team === 'CHAOS');
+  return (
+    <>
+      {snap!.kind === 'ingame' && <TopHud snap={snap!} />}
+      {snap!.kind === 'ingame' && <SpellTracker enemies={enemies} ready={ready} />}
+      {build && <BuildDock build={build} ready={ready} />}
+    </>
+  );
+}
+
+// ---- demo data (browser preview only; replaced by live data when window.cward exists) ----
+function demoSnap(): Snapshot | null {
+  if (window.cward) return null;
+  const mk = (riotId: string, champion: string, champKey: string, team: 'ORDER' | 'CHAOS', spells: string[]): Player => ({
+    riotId, name: riotId, champion, champKey, team, position: '', level: 11, isBot: false, dead: false, respawn: 0,
+    k: 3, d: 2, a: 5, cs: 120, ward: 2, spells: spells.map((k) => ({ name: k, key: k })), items: [],
+  });
+  return {
+    kind: 'ingame', t: Date.now(), phase: 'InProgress', game: { mode: 'KIWI', mapId: 12, time: 723 },
+    active: { riotId: 'me#KR1', level: 11, gold: 2450, hp: 1400, maxHp: 1800, resourceType: 'MANA', res: 300, maxRes: 600, abilities: { Q: 5, W: 3, E: 2, R: 2 } },
+    players: [
+      mk('me#KR1', 'Annie', 'Annie', 'ORDER', ['Flash', 'Dot']),
+      mk('A#KR', 'Ezreal', 'Ezreal', 'CHAOS', ['Flash', 'Heal']),
+      mk('B#KR', 'Fiddlesticks', 'FiddleSticks', 'CHAOS', ['Flash', 'Teleport']),
+      mk('C#KR', 'Caitlyn', 'Caitlyn', 'CHAOS', ['Flash', 'Heal']),
+    ],
+    objectives: { dragons: [{ type: '화', time: 300 }], barons: 0, heralds: 1, atakhan: 0, towers: { ORDER: 3, CHAOS: 1 } },
+    recent: [],
+  };
+}
+function demoBuild(): Build {
+  if (window.cward) return null;
+  return {
+    champion: 'ANNIE', mode: 'aram', winRate: 0.47,
+    items: { ids: [3118, 4646, 4645], names: ['Malignance', 'Stormsurge', 'Shadowflame'], play: 1754, win: 885 },
+    boots: [3020], starter: [], skills: ['Q', 'W', 'E', 'Q', 'Q', 'R', 'Q', 'W', 'Q', 'W', 'R'], spells: [4, 32],
+    runes: { primary: [8128, 8126, 8140, 8106], secondary: [8210, 8236], statMods: [5008, 5008, 5001] },
+  };
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

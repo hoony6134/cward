@@ -20,7 +20,6 @@ let pairData = null;          // { link, qr }
 let latestSnap = null;
 let agent = null;
 let overlayManual = null;     // null = auto (show only in-game); true/false = user override
-let overlayInteractive = false;
 let activeMiss = 0;           // consecutive non-active snapshots (debounces auto-hide)
 let overlayShouldShow = false; // what WE want; distinguishes our hide from a system hide
 
@@ -73,7 +72,6 @@ function buildTray() {
   const menu = Menu.buildFromTemplate([
     { label: '폰 연동 QR 보기', click: showPairing },
     { label: '오버레이 표시/숨기기  ⌘⇧O', click: () => toggleOverlay() },
-    { label: '오버레이 조작 모드  ⌘⇧I', click: () => setInteractive(!overlayInteractive) },
     { type: 'separator' },
     { label: '종료', click: () => app.quit() },
   ]);
@@ -84,15 +82,14 @@ function buildTray() {
 // ---- Overlay window: transparent, always-on-top, click-through by default ----
 function createOverlay() {
   const { workArea } = screen.getPrimaryDisplay();
-  const w = 340;
-  const h = Math.min(760, workArea.height - 24);
+  // Full work-area overlay; panels are positioned by CSS (left rail, build dock…).
+  // The window is click-through everywhere; panels that need clicks toggle mouse
+  // capture on hover (ipc 'overlay:mouse-ignore').
   overlayWin = new BrowserWindow({
-    x: workArea.x + workArea.width - w - 12,
-    y: workArea.y + 12,
-    width: w, height: h,
+    x: workArea.x, y: workArea.y, width: workArea.width, height: workArea.height,
     transparent: true, frame: false, hasShadow: false,
-    resizable: false, movable: true, skipTaskbar: true,
-    focusable: false, show: false, fullscreenable: false,
+    resizable: false, movable: false, skipTaskbar: true,
+    focusable: false, show: false, fullscreenable: false, enableLargerThanScreen: true,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
@@ -100,22 +97,22 @@ function createOverlay() {
   // orders our window out — a "hide" event we didn't ask for. Bring it straight back
   // (showInactive doesn't steal focus from the game). Our own hides set
   // overlayShouldShow=false first, so those are left alone.
+  // If macOS still orders the window out when we're deactivated, bring it right
+  // back with no visible delay (showInactive doesn't steal focus from the game).
   overlayWin.on('hide', () => {
     if (overlayShouldShow && overlayWin && !overlayWin.isDestroyed()) {
-      setTimeout(() => {
+      setImmediate(() => {
         try {
           if (overlayShouldShow && overlayWin && !overlayWin.isDestroyed()) {
             overlayWin.showInactive();
             overlayWin.setAlwaysOnTop(true, 'screen-saver');
           }
         } catch { /* noop */ }
-      }, 50);
+      });
     }
   });
-  // skipTransformProcessType keeps a dock-hidden (accessory) app from switching
-  // activation policy here — without it the overlay hides when you click elsewhere.
-  overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-  overlayWin.setIgnoreMouseEvents(true, { forward: true }); // click-through until interactive
+  overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  overlayWin.setIgnoreMouseEvents(true, { forward: true }); // click-through; panels toggle capture on hover
   overlayWin.webContents.on('did-finish-load', () => console.log('[overlay] loaded'));
   overlayWin.webContents.on('did-fail-load', (_e, code, desc) => console.log('[overlay] load failed', code, desc));
   overlayWin.loadFile(path.join(__dirname, '../renderer-dist/overlay.html'));
@@ -136,13 +133,11 @@ function toggleOverlay() {
   setOverlayShown(show);
 }
 
-function setInteractive(on) {
-  overlayInteractive = on;
-  if (!overlayWin || overlayWin.isDestroyed()) return;
-  overlayWin.setIgnoreMouseEvents(!on, { forward: true });
-  overlayWin.setFocusable(on);
-  if (on) { overlayManual = true; setOverlayShown(true); overlayWin.focus(); }
-}
+// Renderer toggles mouse capture as the pointer moves on/off a clickable panel,
+// so only the panels catch clicks and the rest of the screen stays click-through.
+ipcMain.on('overlay:mouse-ignore', (_e, ignore) => {
+  if (overlayWin && !overlayWin.isDestroyed()) overlayWin.setIgnoreMouseEvents(!!ignore, { forward: true });
+});
 
 // ---- Build recommendations (OP.GG) — in-game AND champ select ----
 const buildCache = new Map(); // key -> build | null
@@ -197,7 +192,6 @@ async function updateReco(snap) {
 
 function registerShortcuts() {
   globalShortcut.register('CommandOrControl+Shift+O', () => toggleOverlay());
-  globalShortcut.register('CommandOrControl+Shift+I', () => setInteractive(!overlayInteractive));
 }
 
 function trayIcon() {

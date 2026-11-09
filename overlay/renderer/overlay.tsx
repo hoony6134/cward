@@ -21,10 +21,13 @@ declare global {
       onReco: (cb: (b: Build) => void) => void;
       onPairing: (cb: (d: { link: string; qr: string }) => void) => void;
       setMouseIgnore: (ignore: boolean) => void;
+      getAugments: () => Promise<Augment[] | null>;
       ready: () => void;
     };
   }
 }
+
+type Augment = { name: string; desc: string; tier: string };
 
 // When a panel captures clicks, the full-screen window must briefly stop ignoring
 // the mouse while the pointer is over it; otherwise clicks fall through to the game.
@@ -164,6 +167,47 @@ function BuildDock({ build, ready, full }: { build: NonNullable<Build>; ready: b
   );
 }
 
+// ARAM: Mayhem augment reference — searchable, grouped by rarity grade. (Win-rate
+// S/A/B/C tiers have no clean data source, so this shows Riot's rarity + what each does.)
+const TIER_KO: Record<string, { ko: string; color: string }> = {
+  Prismatic: { ko: '프리즘', color: '#d98cff' },
+  Gold: { ko: '골드', color: '#e9c877' },
+  Silver: { ko: '실버', color: '#c7d2dd' },
+};
+function AugmentPanel() {
+  const [list, setList] = useState<Augment[] | null>(null);
+  const [q, setQ] = useState('');
+  const drag = useDraggable('augments', { left: Math.max(0, window.innerWidth - 314), top: 60 });
+  useEffect(() => {
+    if (window.cward) { window.cward.getAugments().then((a) => setList(a)); return; }
+    setList([ // browser-preview demo only
+      { name: 'Back to Basics', tier: 'Prismatic', desc: '챔피언 스킬 피해 35% 증가, 주문 가속 70, 회복·보호막 35% 증가. 단 궁극기 영구 잠금.' },
+      { name: 'Jeweled Gauntlet', tier: 'Gold', desc: '스킬이 치명타로 적중할 수 있습니다.' },
+      { name: 'Blunt Force', tier: 'Silver', desc: '공격력 20% 증가.' },
+    ]);
+  }, []);
+  const shown = (list ?? []).filter((a) => !q || a.name.toLowerCase().includes(q.toLowerCase()) || a.desc.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className="card augment-panel" style={drag.style} {...capture}>
+      <div className="title" {...drag.handle}>증강 설명 ⠿</div>
+      <input className="aug-search" placeholder="증강 검색…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="aug-list">
+        {list == null ? <div className="muted" style={{ fontSize: 11, padding: 6 }}>불러오는 중…</div>
+          : shown.length === 0 ? <div className="muted" style={{ fontSize: 11, padding: 6 }}>결과 없음</div>
+          : shown.map((a, i) => (
+            <div className="aug-row" key={i}>
+              <div className="row" style={{ gap: 6 }}>
+                <span className="aug-tier" style={{ background: (TIER_KO[a.tier]?.color ?? '#888') }}>{TIER_KO[a.tier]?.ko ?? a.tier}</span>
+                <b style={{ fontSize: 12 }}>{a.name}</b>
+              </div>
+              <div className="aug-desc">{a.desc}</div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 function TopHud({ snap }: { snap: Snapshot }) {
   const o = snap.objectives;
   const drag = useDraggable('hud', { left: Math.round(window.innerWidth / 2 - 120), top: 12 });
@@ -208,6 +252,7 @@ function App() {
       <SpellTracker enemies={enemies} ready={ready} />
       {me?.champKey && build?.skills?.length ? <AbilityBar champKey={me.champKey} abilities={snap!.active?.abilities} skills={build.skills} ready={ready} /> : null}
       {build && <BuildDock build={build} ready={ready} />}
+      {snap!.game?.mode === 'KIWI' && <AugmentPanel />}
     </>
   );
 }

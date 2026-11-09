@@ -9,6 +9,7 @@ import QRCode from 'qrcode';
 import { loadConfig, pairingLink } from './config.mjs';
 import { startAgent } from '../../agent/src/agent.mjs';
 import { getBuild } from './reco/opgg.mjs';
+import { getAugments } from './reco/augments.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -145,6 +146,9 @@ function toggleOverlay() {
 ipcMain.on('overlay:mouse-ignore', (_e, ignore) => {
   if (overlayWin && !overlayWin.isDestroyed()) overlayWin.setIgnoreMouseEvents(!!ignore, { forward: true });
 });
+
+// ARAM: Mayhem augment reference (name/tier/description) for the overlay.
+ipcMain.handle('augments:get', () => getAugments());
 
 // ---- Build recommendations (OP.GG) — in-game AND champ select ----
 const buildCache = new Map(); // key -> build | null

@@ -79,3 +79,37 @@ body {
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Landing: immersive hero ---- */
+.landing { position: relative; }
+.landing-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  background:
+    radial-gradient(60vmax 60vmax at 50% -12%, rgba(255,78,142,.12), transparent 60%),
+    radial-gradient(48vmax 48vmax at 85% 12%, rgba(10,200,185,.08), transparent 60%),
+    radial-gradient(70vmax 70vmax at 12% 92%, rgba(200,170,110,.08), transparent 60%);
+}
+.landing-bg::before {
+  content: ''; position: absolute; inset: -30%;
+  background: conic-gradient(from 0deg, transparent, rgba(255,78,142,.06), transparent 38%, rgba(10,200,185,.05), transparent 70%, transparent);
+  animation: aurora 26s linear infinite;
+}
+@keyframes aurora { to { transform: rotate(360deg); } }
+
+.drop-gold { text-shadow: 0 0 26px rgba(200,170,110,.35); letter-spacing: .06em; }
+
+.wardmark { animation: float 5s ease-in-out infinite; filter: drop-shadow(0 8px 24px rgba(255,78,142,.2)); }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.wardmark .glow { transform-origin: 60px 46px; animation: glowpulse 3.2s ease-in-out infinite; }
+@keyframes glowpulse { 0%, 100% { opacity: .5; transform: scale(.96); } 50% { opacity: .95; transform: scale(1.04); } }
+
+.step-num {
+  flex: none; width: 1.7rem; height: 1.7rem; border-radius: 3px;
+  display: grid; place-items: center;
+  font-family: 'Cinzel', serif; font-size: .82rem;
+  color: #0a0f16; background: linear-gradient(180deg, #d8bd86, var(--gold));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-bg::before, .wardmark, .wardmark .glow { animation: none; }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRelay, clearPairing, parsePairing, savePairing, type Snapshot, type Player, type Command } from './useRelay';
 import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, allChampions, champIcon, champIconById, champ, itemIcon,
@@ -1073,21 +1073,104 @@ function Waiting({ status, clientOff, phase }: { status: string; clientOff: bool
   );
 }
 
+const RELEASES_URL = 'https://github.com/hoony6134/ward/releases';
+const DL = {
+  win: `${RELEASES_URL}/latest/download/cward-agent-windows-x64.exe`,
+  macArm: `${RELEASES_URL}/latest/download/cward-agent-macos-arm64`,
+  macX64: `${RELEASES_URL}/latest/download/cward-agent-macos-x64`,
+};
+
+function WardMark() {
+  return (
+    <svg className="wardmark" width="104" height="130" viewBox="0 0 120 150" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="wm-gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#e4cf94" /><stop offset=".55" stopColor="#c8aa6e" /><stop offset="1" stopColor="#8a6f3c" />
+        </linearGradient>
+        <linearGradient id="wm-gem" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ff7ab0" /><stop offset=".45" stopColor="#ff3d82" /><stop offset="1" stopColor="#b51e5f" />
+        </linearGradient>
+        <radialGradient id="wm-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stopColor="#ff4e8e" stopOpacity=".85" /><stop offset=".6" stopColor="#ff4e8e" stopOpacity=".16" /><stop offset="1" stopColor="#ff4e8e" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle className="glow" cx="60" cy="46" r="54" fill="url(#wm-glow)" />
+      <path d="M60 96 L80 108 L72 146 Q60 152 48 146 L40 108 Z" fill="url(#wm-gold)" />
+      <path d="M44 114 H76 M47 130 H73" stroke="#0a1626" strokeWidth="3" strokeLinecap="round" opacity=".5" />
+      <path d="M42 96 Q60 82 78 96 L72 103 Q60 94 48 103 Z" fill="url(#wm-gold)" />
+      <g stroke="#ffd8e8" strokeWidth="2" strokeLinejoin="round">
+        <path d="M60 10 L86 42 L60 96 L34 42 Z" fill="url(#wm-gem)" />
+        <path d="M34 42 H86" strokeWidth="1.5" opacity=".6" />
+        <path d="M60 10 L60 96" strokeWidth="1.5" opacity=".6" />
+      </g>
+      <path d="M60 20 L76 40 L60 50 L44 40 Z" fill="#fff" opacity=".45" />
+    </svg>
+  );
+}
+
+function Step({ n, title, children }: { n: string; title: string; children: ReactNode }) {
+  return (
+    <div className="panel p-4 flex gap-3 text-left enter">
+      <div className="step-num">{n}</div>
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="text-sm font-bold text-[var(--text)]">{title}</div>
+        <div className="text-xs text-[var(--muted)] leading-relaxed space-y-2">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 function Pairing() {
   const [v, setV] = useState('');
   const [err, setErr] = useState(false);
   const connect = () => { const p = parsePairing(v); if (p) savePairing(p); else setErr(true); };
   return (
-    <div className="min-h-dvh grid place-items-center px-6 text-center">
-      <div className="space-y-4 max-w-sm w-full">
-        <div className="font-hud text-4xl text-[var(--gold)]">CWARD</div>
-        <h1 className="text-xl font-bold">페어링</h1>
-        <p className="text-sm text-[var(--muted)]">PC에서 <code className="text-[var(--text)]">npm run qr</code>로 나온 <b>페어링 링크를 복사해 아래에 붙여넣으세요.</b> (설치형 앱은 링크가 자동으로 안 넘어와요.)</p>
-        <input value={v} onChange={(e) => { setV(e.target.value); setErr(false); }} placeholder="페어링 링크 붙여넣기"
-          className={`w-full px-3 py-3 rounded bg-[#0a1420] text-sm outline-none ring-1 ${err ? 'ring-[var(--red)]' : 'ring-[var(--gold-dim)]'}`} />
-        {err && <p className="text-xs text-[var(--red)]">링크에 room·token이 없어요. 전체 링크를 붙여넣어 주세요.</p>}
-        <button onClick={connect} className="btn btn-blue w-full py-3 font-bold font-hud">연결</button>
-      </div>
+    <div className="landing">
+      <div className="landing-bg" aria-hidden="true" />
+      <main className="relative z-10 min-h-dvh flex flex-col items-center gap-9 px-6 py-14" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 2.5rem)' }}>
+        <section className="flex flex-col items-center text-center gap-4">
+          <WardMark />
+          <div>
+            <div className="font-hud text-5xl text-[var(--gold)] drop-gold">CWARD</div>
+            <p className="mt-2 text-sm text-[var(--muted)]">제어와드처럼, 시야 밖까지 — 폰에서 보는 League 인게임</p>
+          </div>
+        </section>
+
+        <section className="panel w-full max-w-sm p-5 flex flex-col gap-3 enter">
+          <div className="panel-title">페어링</div>
+          <input value={v} onChange={(e) => { setV(e.target.value); setErr(false); }} placeholder="페어링 링크 붙여넣기"
+            onKeyDown={(e) => { if (e.key === 'Enter') connect(); }}
+            className={`w-full px-3 py-3 rounded bg-[#0a1420] text-sm outline-none ring-1 transition ${err ? 'ring-[var(--red)]' : 'ring-[var(--gold-dim)] focus:ring-[var(--blue)]'}`} />
+          {err && <p className="text-xs text-[var(--red)]">링크에 room·token이 없어요. 전체 링크를 붙여넣어 주세요.</p>}
+          <button onClick={connect} className="btn btn-blue w-full py-3 font-bold font-hud">연결</button>
+          <p className="text-xs text-[var(--muted)]">PC에서 에이전트를 실행하면 나오는 링크를 붙여넣으세요. 토큰은 이 기기에만 저장돼 다음부턴 자동 연결돼요.</p>
+        </section>
+
+        <section className="w-full max-w-sm flex flex-col gap-3">
+          <div className="panel-title text-center">설치 가이드</div>
+          <Step n="1" title="PC에 에이전트 설치">
+            <p>League가 켜진 PC의 OS에 맞는 파일을 받아 실행하면 끝 — Node 설치 불필요.</p>
+            <div className="grid grid-cols-3 gap-2 not-prose">
+              <a href={DL.win} className="btn btn-gold flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold leading-tight">Windows<span className="opacity-70 font-normal">x64 .exe</span></a>
+              <a href={DL.macArm} className="btn btn-gold flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold leading-tight">macOS<span className="opacity-70 font-normal">Apple Silicon</span></a>
+              <a href={DL.macX64} className="btn btn-gold flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold leading-tight">macOS<span className="opacity-70 font-normal">Intel</span></a>
+            </div>
+            <p className="text-center"><a href={RELEASES_URL} target="_blank" rel="noreferrer" className="underline text-[var(--gold)]">전체 릴리스 보기 ↗</a></p>
+            <p><b className="text-[var(--text)]">Windows</b>: 다운로드한 <code className="text-[var(--text)]">.exe</code> 더블클릭 → "추가 정보 → 실행".</p>
+            <p><b className="text-[var(--text)]">macOS</b> (서명 없는 파일이라 격리 해제 필요):</p>
+            <pre className="whitespace-pre-wrap break-all rounded bg-[#060c14] p-2 text-[11px] text-[var(--gold-br)] ring-1 ring-[var(--gold-dim)]">xattr -dr com.apple.quarantine ~/Downloads/cward-agent-macos-arm64
+chmod +x ~/Downloads/cward-agent-macos-arm64 && ~/Downloads/cward-agent-macos-arm64</pre>
+          </Step>
+          <Step n="2" title="실행 → 페어링 링크 생성">
+            <p>첫 실행 때 방·토큰이 자동 생성되고(<code>cward.config.json</code>), 폰 연결 QR과 링크가 콘솔에 떠요. 게임 전엔 그 파일만 다시 실행하면 됩니다.</p>
+          </Step>
+          <Step n="3" title="링크 붙여넣기 → 연결">
+            <p>콘솔의 링크를 복사해 위 칸에 붙여넣고 <b className="text-[var(--text)]">연결</b>. QR을 폰 카메라로 스캔해 열어도 돼요.</p>
+          </Step>
+        </section>
+
+        <footer className="text-[10px] text-[var(--muted)] opacity-60 pb-4">wss(TLS) · 방별 공유 토큰 · 서버 시크릿 없음</footer>
+      </main>
     </div>
   );
 }

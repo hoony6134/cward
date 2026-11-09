@@ -1,4 +1,4 @@
-# LoL Companion (나만의 버전)
+# CWard
 
 로컬 PC에서 League의 **Live Client Data API**(`:2999`, 인증 불필요)를 읽어, 무료
 Cloudflare 릴레이를 거쳐 **폰에서 리치한 인게임 정보**를 한국어로 봅니다.
@@ -23,11 +23,17 @@ npm run deploy                        # 출력된 https://...workers.dev 주소 
 
 ## 2. 폰 UI 배포 (web, Cloudflare Worker + 정적 에셋)
 
+**배포는 CI/CD로 자동**입니다 — `main`에 푸시하면 Cloudflare Workers Builds가 `web/`에서
+`npm run build` 후 `npx wrangler deploy`를 돌려 `cward-web` Worker(커스텀 도메인
+`cward.gg.scian.xyz`)에 올립니다. 릴레이 주소는 코드에 기본값(`wss://relay.cward.gg.scian.xyz/ws`)이
+박혀 있어 `.env` 없이도 빌드됩니다. 다른 릴레이를 쓰려면 `web/.env`에 `VITE_RELAY_WS_URL`로 덮어쓰세요.
+
 ```bash
-cd web && npm install
-echo 'VITE_RELAY_WS_URL=wss://relay.<your-domain>/ws' > .env   # 1번 Worker 주소
-npm run deploy   # build 후 wrangler deploy (cward-web Worker). 도메인/라우트는 web/wrangler.jsonc 참고
+git push origin main      # → Workers Builds가 자동 빌드·배포
 ```
+
+> 수동 배포가 필요하면 `cd web && npm install && npm run deploy`. Git 연동은 Cloudflare
+> 대시보드 → cward-web → 설정 → 빌드 → Git 리포지토리 연결(루트 디렉터리 `web`)에서 한 번만 설정.
 
 ## 3. 로컬 에이전트 (agent)
 

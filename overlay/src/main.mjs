@@ -41,11 +41,15 @@ app.whenReady().then(async () => {
       latestSnap = s;
       overlayWin?.webContents.send('snapshot', s);
       const active = s.kind === 'ingame' || s.kind === 'champselect';
-      // Auto-follow, but tolerate transient non-active snapshots (a single failed
-      // :2999 poll briefly looks non-ingame) so the overlay doesn't flicker/vanish.
-      if (overlayManual === null) {
-        if (active) { activeMiss = 0; setOverlayShown(true); }
-        else if (++activeMiss >= 3) setOverlayShown(false);
+      // Auto-follow: show in game/champ-select unless the user hid it for THIS game.
+      // Leaving the game resets the manual override so the next game auto-shows again.
+      // The 3-tick debounce tolerates a transient failed :2999 poll without flicker.
+      if (active) {
+        activeMiss = 0;
+        if (overlayManual !== false) setOverlayShown(true);
+      } else if (++activeMiss >= 3) {
+        setOverlayShown(false);
+        overlayManual = null;
       }
       if (active) updateReco(s);
     },

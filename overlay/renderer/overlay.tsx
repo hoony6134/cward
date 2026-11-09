@@ -117,18 +117,25 @@ function maxOrder(order: string[]): string[] {
   return ['Q', 'W', 'E'].sort((a, b) => c[b][0] - c[a][0] || c[a][1] - c[b][1]);
 }
 
-function BuildDock({ build, ready }: { build: NonNullable<Build>; ready: boolean }) {
+function BuildDock({ build, ready, abilities }: { build: NonNullable<Build>; ready: boolean; abilities?: { Q: number; W: number; E: number; R: number } | null }) {
   const wr = build.winRate != null ? ` · 승률 ${Math.round(build.winRate * 100)}%` : '';
   const items = [...(build.items?.ids ?? []), ...build.boots];
   const drag = useDraggable('build', { left: Math.max(0, window.innerWidth - 314), top: Math.max(0, window.innerHeight - 230) });
+  // Points already spent = sum of current ability ranks → next skill is order[spent].
+  const spent = abilities ? abilities.Q + abilities.W + abilities.E + abilities.R : 0;
   return (
     <div className="card build-dock" style={drag.style} {...capture}>
       <div className="title" {...drag.handle}>추천 빌드 · OP.GG ({build.mode}){wr} ⠿</div>
       {items.length ? <div className="wrap" style={{ marginBottom: 8 }}>{ready && items.map((id, i) => <img key={i} className="itm" src={itemIcon(id)} />)}</div> : null}
+      {build.skills.length ? (
+        <div style={{ marginBottom: 6 }}>
+          <span className="muted" style={{ fontSize: 10 }}>선마 {maxOrder(build.skills).join('›')} · 다음 </span>
+          <span className="sk-strip">
+            {build.skills.map((k, i) => <b key={i} className={`sk ${i < spent ? 'done' : i === spent ? 'next' : ''}`}>{k}</b>)}
+          </span>
+        </div>
+      ) : null}
       <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-        {build.skills.length ? (
-          <span><span className="muted" style={{ fontSize: 10 }}>선마 </span><b style={{ color: '#e9c877', fontSize: 12 }}>{maxOrder(build.skills).join(' › ')}</b></span>
-        ) : null}
         {build.runes && ready ? <span className="wrap">{[...build.runes.primary.slice(0, 1), ...build.runes.secondary.slice(0, 1)].map((id, i) => <img key={i} className="rune" src={perkIcon(id)} />)}</span> : null}
         {build.spells.length && ready ? <span className="wrap">{build.spells.map((id, i) => { const s = sumSpellIcon(id); return s ? <img key={i} className="sp" src={s} /> : null; })}</span> : null}
       </div>
@@ -175,7 +182,7 @@ function App() {
     <>
       {snap!.kind === 'ingame' && <TopHud snap={snap!} />}
       {snap!.kind === 'ingame' && <SpellTracker enemies={enemies} ready={ready} />}
-      {build && <BuildDock build={build} ready={ready} />}
+      {build && <BuildDock build={build} ready={ready} abilities={snap!.active?.abilities} />}
     </>
   );
 }
@@ -189,7 +196,7 @@ function demoSnap(): Snapshot | null {
   });
   return {
     kind: 'ingame', t: Date.now(), phase: 'InProgress', game: { mode: 'KIWI', mapId: 12, time: 723 },
-    active: { riotId: 'me#KR1', level: 11, gold: 2450, hp: 1400, maxHp: 1800, resourceType: 'MANA', res: 300, maxRes: 600, abilities: { Q: 5, W: 3, E: 2, R: 2 } },
+    active: { riotId: 'me#KR1', level: 6, gold: 2450, hp: 1400, maxHp: 1800, resourceType: 'MANA', res: 300, maxRes: 600, abilities: { Q: 3, W: 1, E: 1, R: 1 } },
     players: [
       mk('me#KR1', 'Annie', 'Annie', 'ORDER', ['Flash', 'Dot']),
       mk('A#KR', 'Ezreal', 'Ezreal', 'CHAOS', ['Flash', 'Heal']),
@@ -205,7 +212,7 @@ function demoBuild(): Build {
   return {
     champion: 'ANNIE', mode: 'aram', winRate: 0.47,
     items: { ids: [3118, 4646, 4645], names: ['Malignance', 'Stormsurge', 'Shadowflame'], play: 1754, win: 885 },
-    boots: [3020], starter: [], skills: ['Q', 'W', 'E', 'Q', 'Q', 'R', 'Q', 'W', 'Q', 'W', 'R'], spells: [4, 32],
+    boots: [3020], starter: [], skills: ['Q', 'W', 'E', 'Q', 'Q', 'R', 'Q', 'W', 'Q', 'W', 'R', 'W', 'W', 'E', 'E'], spells: [4, 32],
     runes: { primary: [8128, 8126, 8140, 8106], secondary: [8210, 8236], statMods: [5008, 5008, 5001] },
   };
 }

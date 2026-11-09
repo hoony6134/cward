@@ -33,7 +33,7 @@ jobs:
     # Apple Silicon runner → arm64 .dmg. Needs these repo secrets (set once):
     #   CSC_LINK (Developer ID .p12 base64), CSC_KEY_PASSWORD,
     #   APPLE_API_KEY_P8 (ASC key .p8 base64), APPLE_API_KEY_ID, APPLE_API_ISSUER
-    runs-on: macos-14
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

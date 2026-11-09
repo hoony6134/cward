@@ -1,4 +1,4 @@
-// Minimal service worker: makes Ward installable and ready for push.
+// Minimal service worker: makes CWard installable and ready for push.
 // Real server push (closed-app) needs VAPID + the relay sending pushes — next step.
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil((async () => {
@@ -29,7 +29,7 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { /* ignore */ }
-  e.waitUntil(self.registration.showNotification(d.title || 'Ward', { body: d.body || '', icon: '/icon.svg' }));
+  e.waitUntil(self.registration.showNotification(d.title || 'CWard', { body: d.body || '', icon: '/icon.svg' }));
 });
 
 self.addEventListener('notificationclick', (e) => {

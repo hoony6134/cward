@@ -293,7 +293,7 @@ async function runCommand({ cmd, ...a }) {
     }
     case 'applyRunePage': { // champ-select: write runes into the current rune page
       const cur = await lcuGet(lcu, '/lol-perks/v1/currentpage').catch(() => null);
-      const page = { name: cur?.name || 'Ward', primaryStyleId: a.perkStyle, subStyleId: a.perkSubStyle, selectedPerkIds: a.perkIds, current: true };
+      const page = { name: cur?.name || 'CWard', primaryStyleId: a.perkStyle, subStyleId: a.perkSubStyle, selectedPerkIds: a.perkIds, current: true };
       if (cur?.id && cur.isEditable) return void (await lcuPut(lcu, `/lol-perks/v1/pages/${cur.id}`, { ...page, id: cur.id, order: cur.order }));
       return void (await lcuPost(lcu, '/lol-perks/v1/pages', page)); // shortcut: current page locked → add one (may hit page cap); upgrade: delete an editable page first
     }

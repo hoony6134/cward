@@ -1,6 +1,6 @@
 {
-  "name": "Ward",
-  "short_name": "Ward",
+  "name": "CWard",
+  "short_name": "CWard",
   "description": "League 컴패니언 — 로비·챔프선택 조작, 인게임 오버레이",
   "start_url": "/",
   "scope": "/",

@@ -95,10 +95,12 @@ function createOverlay() {
     transparent: true, frame: false, hasShadow: false,
     resizable: false, movable: false, skipTaskbar: true,
     focusable: false, show: false, fullscreenable: false, enableLargerThanScreen: true,
+    // Non-activating panel: stays visible when the game is focused AND clicking/
+    // dragging it does not steal focus from the game. (A regular window does both
+    // wrong here.) No 'hide' re-show handler → no churn / ping spikes.
+    type: 'panel',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
-  // Regular always-on-top window (NOT a panel): a normal window stays visible when
-  // the app is deactivated (clicking the game), so there's no hide/re-show churn.
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
   overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWin.setIgnoreMouseEvents(true, { forward: true }); // click-through; panels toggle capture on hover

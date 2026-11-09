@@ -28,6 +28,7 @@ assert.strictEqual(toOpggChamp('MissFortune'), 'MISS_FORTUNE', 'MissFortune');
 assert.strictEqual(toOpggChamp('MonkeyKing'), 'WUKONG', 'MonkeyKing override');
 assert.strictEqual(toOpggChamp('Annie'), 'ANNIE', 'Annie');
 assert.strictEqual(toOpggMode('ARAM'), 'aram', 'aram');
+assert.strictEqual(toOpggMode('KIWI'), 'aram', 'mayhem (KIWI) → aram');
 assert.strictEqual(toOpggMode('CLASSIC'), 'ranked', 'classic');
 assert.strictEqual(toOpggMode('CHERRY'), 'ranked', 'unknown → ranked fallback');
 

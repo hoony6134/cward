@@ -32,7 +32,9 @@ export function toOpggChamp(champKey) {
 // so builds fall back to aram (augments are fetched separately).
 export function toOpggMode(liveMode) {
   const m = (liveMode || '').toUpperCase();
-  if (m.includes('ARAM') || m === 'MAYHEM') return 'aram';
+  // KIWI = Live Client gameMode for ARAM: Mayhem (증강 칼바람 / 아수라장). MCP has no
+  // mayhem build, so fall back to aram (same map/items); augments come separately.
+  if (m.includes('ARAM') || m === 'MAYHEM' || m === 'KIWI') return 'aram';
   if (m.includes('URF')) return 'urf';
   if (m.includes('NEXUS') || m === 'NEXUSBLITZ') return 'nexus_blitz';
   return 'ranked';

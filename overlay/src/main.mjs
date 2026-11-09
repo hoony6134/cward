@@ -21,6 +21,7 @@ let latestSnap = null;
 let agent = null;
 let overlayManual = null;     // null = auto (show only in-game); true/false = user override
 let overlayInteractive = false;
+let activeMiss = 0;           // consecutive non-active snapshots (debounces auto-hide)
 
 // Single instance only — a second launch just reveals pairing.
 if (!app.requestSingleInstanceLock()) { app.quit(); }
@@ -36,7 +37,12 @@ app.whenReady().then(async () => {
       latestSnap = s;
       overlayWin?.webContents.send('snapshot', s);
       const active = s.kind === 'ingame' || s.kind === 'champselect';
-      if (overlayManual === null) setOverlayShown(active); // auto-follow unless user overrode
+      // Auto-follow, but tolerate transient non-active snapshots (a single failed
+      // :2999 poll briefly looks non-ingame) so the overlay doesn't flicker/vanish.
+      if (overlayManual === null) {
+        if (active) { activeMiss = 0; setOverlayShown(true); }
+        else if (++activeMiss >= 3) setOverlayShown(false);
+      }
       if (active) updateReco(s);
     },
     onStatus: (s) => { if (tray) tray.setToolTip(`cward — relay ${s}`); },
@@ -85,7 +91,9 @@ function createOverlay() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
-  overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // skipTransformProcessType keeps a dock-hidden (accessory) app from switching
+  // activation policy here — without it the overlay hides when you click elsewhere.
+  overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   overlayWin.setIgnoreMouseEvents(true, { forward: true }); // click-through until interactive
   overlayWin.webContents.on('did-finish-load', () => console.log('[overlay] loaded'));
   overlayWin.webContents.on('did-fail-load', (_e, code, desc) => console.log('[overlay] load failed', code, desc));

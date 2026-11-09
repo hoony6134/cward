@@ -41,18 +41,19 @@ app.whenReady().then(async () => {
     onSnapshot: (s) => {
       latestSnap = s;
       overlayWin?.webContents.send('snapshot', s);
-      const active = s.kind === 'ingame' || s.kind === 'champselect';
-      // Auto-follow: show in game/champ-select unless the user hid it for THIS game.
-      // Leaving the game resets the manual override so the next game auto-shows again.
-      // The 3-tick debounce tolerates a transient failed :2999 poll without flicker.
+      // A failed :2999 poll DURING a game makes the agent fall back to LCU and emit
+      // kind:'menu' with phase:'InProgress' — that's still in-game, so keep the overlay
+      // shown (this was making it vanish during fights). Only a real idle state hides it.
+      const inProgress = s.kind === 'menu' && s.phase === 'InProgress';
+      const active = s.kind === 'ingame' || s.kind === 'champselect' || inProgress;
       if (active) {
         activeMiss = 0;
         if (overlayManual !== false) setOverlayShown(true);
-      } else if (++activeMiss >= 3) {
+      } else if (++activeMiss >= 6) { // ~12s of sustained idle before auto-hiding
         setOverlayShown(false);
         overlayManual = null;
       }
-      if (active) updateReco(s);
+      if (s.kind === 'ingame' || s.kind === 'champselect') updateReco(s);
     },
     onStatus: (s) => { if (tray) tray.setToolTip(`cward — relay ${s}`); },
   });

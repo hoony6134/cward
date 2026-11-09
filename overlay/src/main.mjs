@@ -35,8 +35,9 @@ app.whenReady().then(async () => {
     onSnapshot: (s) => {
       latestSnap = s;
       overlayWin?.webContents.send('snapshot', s);
-      if (overlayManual === null) setOverlayShown(s.kind === 'ingame'); // auto-follow unless user overrode
-      if (s.kind === 'ingame') updateReco(s);
+      const active = s.kind === 'ingame' || s.kind === 'champselect';
+      if (overlayManual === null) setOverlayShown(active); // auto-follow unless user overrode
+      if (active) updateReco(s);
     },
     onStatus: (s) => { if (tray) tray.setToolTip(`cward — relay ${s}`); },
   });
@@ -113,21 +114,52 @@ function setInteractive(on) {
   if (on) { overlayManual = true; setOverlayShown(true); overlayWin.focus(); }
 }
 
-// ---- Build recommendations (OP.GG), fetched once per champ+mode+position ----
+// ---- Build recommendations (OP.GG) — in-game AND champ select ----
 const buildCache = new Map(); // key -> build | null
 const buildInflight = new Set();
 const POS = { TOP: 'top', JUNGLE: 'jungle', MIDDLE: 'mid', BOTTOM: 'adc', UTILITY: 'support' };
 
+// championId -> ddragon champ key (e.g. 1 -> "Annie"), loaded once from Data Dragon.
+let champKeys = null;
+async function champKeyOf(id) {
+  if (!champKeys) {
+    try {
+      const vers = await fetch('https://ddragon.leagueoflegends.com/api/versions.json').then((r) => r.json());
+      const d = await fetch(`https://ddragon.leagueoflegends.com/cdn/${vers[0]}/data/en_US/champion.json`).then((r) => r.json());
+      champKeys = Object.fromEntries(Object.values(d.data).map((c) => [Number(c.key), c.id]));
+    } catch { champKeys = {}; }
+  }
+  return champKeys[id] || null;
+}
+
+// Resolve (champKey, mode, position) for either an in-game or a champ-select snapshot.
+async function recoTarget(snap) {
+  if (snap.kind === 'ingame') {
+    const me = snap.players?.find((p) => p.riotId === snap.active?.riotId);
+    if (!me?.champKey) return null;
+    return { champKey: me.champKey, mode: snap.game?.mode || 'CLASSIC', position: POS[me.position] || 'mid' };
+  }
+  if (snap.kind === 'champselect') {
+    const id = snap.mine?.championId;
+    if (!id) return null; // no champion picked yet
+    const champKey = await champKeyOf(id);
+    if (!champKey) return null;
+    // ARAM champ select has a bench + rerolls; draft SR does not. (Mayhem shares ARAM builds.)
+    const mode = (snap.benchEnabled || snap.bench?.length || snap.rerolls) ? 'ARAM' : 'CLASSIC';
+    const position = POS[snap.myTeam?.find((c) => c.me)?.position] || 'mid';
+    return { champKey, mode, position };
+  }
+  return null;
+}
+
 async function updateReco(snap) {
-  const me = snap.players?.find((p) => p.riotId === snap.active?.riotId);
-  if (!me?.champKey) return;
-  const mode = snap.game?.mode || 'CLASSIC';
-  const position = POS[me.position] || 'mid';
-  const key = `${me.champKey}:${mode}:${position}`;
+  const t = await recoTarget(snap);
+  if (!t) { overlayWin?.webContents.send('reco', null); return; } // clear panel (no champ yet)
+  const key = `${t.champKey}:${t.mode}:${t.position}`;
   if (buildCache.has(key)) { overlayWin?.webContents.send('reco', buildCache.get(key)); return; }
   if (buildInflight.has(key)) return;
   buildInflight.add(key);
-  const build = await getBuild({ champion: me.champKey, mode, position });
+  const build = await getBuild({ champion: t.champKey, mode: t.mode, position: t.position });
   buildInflight.delete(key);
   buildCache.set(key, build);
   overlayWin?.webContents.send('reco', build);

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, loadItemHaste, loadRunes,
-  champIcon, spellIcon, fmtClock, spellCd, loadUltCd, ultRank, itemHaste, withHaste,
+  champIcon, champIconById, champ, spellIcon, fmtClock, spellCd, loadUltCd, ultRank, itemHaste, withHaste,
   itemIcon, perkIcon, sumSpellIcon,
 } from '@web/ddragon';
 import type { Snapshot, Player } from '@web/useRelay';
@@ -166,6 +166,22 @@ function Hud({ snap, ready }: { snap: Snapshot; ready: boolean }) {
   );
 }
 
+function ChampSelectHead({ snap, ready }: { snap: Snapshot; ready: boolean }) {
+  const id = snap.mine?.championId;
+  const c = id ? champ(id) : null;
+  return (
+    <div className="card drag">
+      <div className="row">
+        {ready && id ? <img className="champ" src={champIconById(id)} alt={c?.name} /> : <span className="champ" style={{ background: '#122235' }} />}
+        <span style={{ fontSize: 13, fontWeight: 700 }}>{c?.name ?? '챔피언 선택'}</span>
+        <span className="muted" style={{ fontSize: 11, marginLeft: 'auto' }}>
+          {snap.timeLeft ? `${snap.timeLeft}s` : '챔프 선택'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [build, setBuild] = useState<Build>(null);
@@ -176,15 +192,24 @@ function App() {
     window.cward.onReco((b) => setBuild(b));
     window.cward.ready();
   }, []);
-  if (!snap || snap.kind !== 'ingame' || !snap.players?.length) {
-    return <div className="card drag idle">cward · 대기 중{snap?.kind ? ` (${snap.kind})` : ''}</div>;
+  if (snap?.kind === 'ingame' && snap.players?.length) {
+    return (
+      <>
+        <Hud snap={snap} ready={ready} />
+        {build && <BuildPanel build={build} ready={ready} />}
+      </>
+    );
   }
-  return (
-    <>
-      <Hud snap={snap} ready={ready} />
-      {build && <BuildPanel build={build} ready={ready} />}
-    </>
-  );
+  if (snap?.kind === 'champselect') {
+    return (
+      <>
+        <ChampSelectHead snap={snap} ready={ready} />
+        {build ? <BuildPanel build={build} ready={ready} />
+          : <div className="card idle">{snap.mine?.championId ? '빌드 불러오는 중…' : '챔피언을 고르면 추천이 떠요'}</div>}
+      </>
+    );
+  }
+  return <div className="card drag idle">cward · 대기 중{snap?.kind ? ` (${snap.kind})` : ''}</div>;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

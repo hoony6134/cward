@@ -1076,7 +1076,7 @@ function Waiting({ status, clientOff, phase }: { status: string; clientOff: bool
 const RELEASES_URL = 'https://github.com/hoony6134/cward/releases';
 const DL = {
   win: `${RELEASES_URL}/latest/download/cward-agent-windows-x64.exe`,
-  macArm: `${RELEASES_URL}/latest/download/cward-agent-macos-arm64`,
+  macApp: `${RELEASES_URL}/latest/download/cward-overlay-macos-arm64.dmg`,
   macX64: `${RELEASES_URL}/latest/download/cward-agent-macos-x64`,
 };
 
@@ -1152,14 +1152,15 @@ function Pairing() {
             <p>League가 켜진 PC의 OS에 맞는 파일을 받아 실행하면 끝 — Node 설치 불필요.</p>
             <div className="grid grid-cols-3 gap-2 not-prose">
               <a href={DL.win} className="btn btn-gold flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold leading-tight">Windows<span className="opacity-70 font-normal">x64 .exe</span></a>
-              <a href={DL.macArm} className="btn btn-gold flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold leading-tight">macOS<span className="opacity-70 font-normal">Apple Silicon</span></a>
-              <a href={DL.macX64} className="btn btn-gold flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold leading-tight">macOS<span className="opacity-70 font-normal">Intel</span></a>
+              <a href={DL.macApp} className="btn btn-gold flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold leading-tight">macOS 앱<span className="opacity-70 font-normal">Apple Silicon .dmg</span></a>
+              <a href={DL.macX64} className="btn btn-gold flex flex-col items-center gap-0.5 py-2 text-[11px] font-bold leading-tight">macOS<span className="opacity-70 font-normal">Intel (에이전트)</span></a>
             </div>
             <p className="text-center"><a href={RELEASES_URL} target="_blank" rel="noreferrer" className="underline text-[var(--gold)]">전체 릴리스 보기 ↗</a></p>
             <p><b className="text-[var(--text)]">Windows</b>: 다운로드한 <code className="text-[var(--text)]">.exe</code> 더블클릭 → "추가 정보 → 실행".</p>
-            <p><b className="text-[var(--text)]">macOS</b> (서명 없는 파일이라 격리 해제 필요):</p>
-            <pre className="whitespace-pre-wrap break-all rounded bg-[#060c14] p-2 text-[11px] text-[var(--gold-br)] ring-1 ring-[var(--gold-dim)]">xattr -dr com.apple.quarantine ~/Downloads/cward-agent-macos-arm64
-chmod +x ~/Downloads/cward-agent-macos-arm64 && ~/Downloads/cward-agent-macos-arm64</pre>
+            <p><b className="text-[var(--text)]">macOS (Apple Silicon)</b>: <code className="text-[var(--text)]">.dmg</code>를 열어 <b className="text-[var(--text)]">cward</b> 앱을 실행 — 서명·공증돼 격리 해제가 필요 없어요. 메뉴바 앱으로 떠서 QR 페어링 + 인게임 오버레이를 제공합니다(터미널 불필요).</p>
+            <p><b className="text-[var(--text)]">macOS (Intel)</b> (서명 없는 에이전트라 격리 해제 필요):</p>
+            <pre className="whitespace-pre-wrap break-all rounded bg-[#060c14] p-2 text-[11px] text-[var(--gold-br)] ring-1 ring-[var(--gold-dim)]">xattr -dr com.apple.quarantine ~/Downloads/cward-agent-macos-x64
+chmod +x ~/Downloads/cward-agent-macos-x64 && ~/Downloads/cward-agent-macos-x64</pre>
           </Step>
           <Step n="2" title="실행 → 페어링 링크 생성">
             <p>첫 실행 때 방·토큰이 자동 생성되고(<code>cward.config.json</code>), 폰 연결 QR과 링크가 콘솔에 떠요. 게임 전엔 그 파일만 다시 실행하면 됩니다.</p>

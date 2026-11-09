@@ -8,7 +8,7 @@ import {
 } from './ddragon';
 import { POSITIONS } from '../../shared/clientstate.mjs';
 
-const RELAY = import.meta.env.VITE_RELAY_WS_URL as string;
+const RELAY = (import.meta.env.VITE_RELAY_WS_URL as string) || 'wss://relay.cward.gg.scian.xyz/ws';
 const posKo = (p: string) =>
   ({ TOP: '탑', JUNGLE: '정글', MIDDLE: '미드', BOTTOM: '원딜', UTILITY: '서폿', '': '지정안함' } as Record<string, string>)[p] ?? p;
 

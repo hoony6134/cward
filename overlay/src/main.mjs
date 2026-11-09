@@ -88,9 +88,14 @@ function createOverlay() {
     transparent: true, frame: false, hasShadow: false,
     resizable: false, movable: true, skipTaskbar: true,
     focusable: false, show: false, fullscreenable: false,
+    // non-activating floating panel: stays above and visible when you click the
+    // game, instead of being ordered out like an ordinary window.
+    type: 'panel',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  // belt-and-suspenders: if focus leaves us (click on the game), re-assert top.
+  overlayWin.on('blur', () => { try { overlayWin.setAlwaysOnTop(true, 'screen-saver'); } catch { /* noop */ } });
   // skipTransformProcessType keeps a dock-hidden (accessory) app from switching
   // activation policy here — without it the overlay hides when you click elsewhere.
   overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });

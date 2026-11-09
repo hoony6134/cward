@@ -20,7 +20,7 @@ declare global {
       onSnapshot: (cb: (s: Snapshot) => void) => void;
       onReco: (cb: (b: Build) => void) => void;
       onPairing: (cb: (d: { link: string; qr: string }) => void) => void;
-      setMouseIgnore: (ignore: boolean) => void;
+      onEditMode: (cb: (on: boolean) => void) => void;
       getAugments: () => Promise<Augment[] | null>;
       ready: () => void;
     };
@@ -31,14 +31,6 @@ type Augment = { id: string; name: string; tier: string; desc: string; icon: str
 
 // When a panel captures clicks, the full-screen window must briefly stop ignoring
 // the mouse while the pointer is over it; otherwise clicks fall through to the game.
-let dragging = false;
-const capture = window.cward
-  ? {
-      onPointerEnter: () => { if (!dragging) window.cward!.setMouseIgnore(false); },
-      onPointerLeave: () => { if (!dragging) window.cward!.setMouseIgnore(true); },
-    }
-  : {};
-
 type Pos = { left: number; top: number };
 // Drag a panel by its title bar; position persists in localStorage. Double-click
 // the title to reset to the default spot.
@@ -49,13 +41,10 @@ function useDraggable(key: string, def: Pos) {
   });
   const onPointerDown = (e: { clientX: number; clientY: number; preventDefault: () => void }) => {
     e.preventDefault();
-    dragging = true;
-    window.cward?.setMouseIgnore(false);
     const sx = e.clientX, sy = e.clientY, base = pos;
     const move = (ev: PointerEvent) => setPos({ left: Math.max(0, base.left + ev.clientX - sx), top: Math.max(0, base.top + ev.clientY - sy) });
     const up = () => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
-      dragging = false; window.cward?.setMouseIgnore(true);
       setPos((p) => { try { localStorage.setItem('cward:pos:' + key, JSON.stringify(p)); } catch { /* ignore */ } return p; });
     };
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
@@ -84,7 +73,7 @@ function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean })
   const rCd = (p: Player) => withHaste(ultCd[p.champKey]?.[ultRank(p.level) - 1] ?? 100, ah(p));
   const drag = useDraggable('spell', { left: 10, top: Math.round(window.innerHeight * 0.5 - 130) });
   return (
-    <div className="card left-rail" style={drag.style} {...capture}>
+    <div className="card left-rail" style={drag.style} >
       <div className="title" {...drag.handle}>상대 스펠 · 궁 쿨 ⠿</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {enemies.map((p) => (
@@ -133,7 +122,7 @@ function SkillHighlight({ abilities, skills }: { abilities?: { Q: number; W: num
   const next = skills[spent];
   return (
     <div className="skill-hl" style={drag.style}>
-      <div className="hl-grip" {...capture} {...drag.handle} title="드래그해서 스킬바에 맞추세요">⠿ 선마</div>
+      <div className="hl-grip"  {...drag.handle} title="드래그해서 스킬바에 맞추세요">⠿ 선마</div>
       <div className="hl-cells">
         {(['Q', 'W', 'E', 'R'] as const).map((k) => (
           <div className={`hl-cell${next === k ? ' next' : ''}`} key={k}><span className="hl-k">{k}</span></div>
@@ -163,8 +152,7 @@ function BuildDock({ build, ready, full, owned }: { build: NonNullable<Build>; r
   // In-game: clean — just the item pictures and the win rate. Whole card drags.
   if (!full) {
     return (
-      <div className="card build-clean" style={{ ...drag.style, cursor: 'move' }} {...capture}
-        onPointerDown={drag.handle.onPointerDown} onDoubleClick={drag.handle.onDoubleClick}>
+      <div className="card build-clean" style={{ ...drag.style, cursor: 'move' }}        onPointerDown={drag.handle.onPointerDown} onDoubleClick={drag.handle.onDoubleClick}>
         {ready && items.map((id, i) => <ItemPic key={i} id={id} owned={owned?.has(id)} />)}
         {wr && <span className="wr">{wr}</span>}
       </div>
@@ -173,7 +161,7 @@ function BuildDock({ build, ready, full, owned }: { build: NonNullable<Build>; r
 
   // Champ select: full set (items, skill order, runes, spells) for pick-time setup.
   return (
-    <div className="card build-dock" style={drag.style} {...capture}>
+    <div className="card build-dock" style={drag.style} >
       <div className="title" {...drag.handle}>추천 빌드 · OP.GG ({build.mode}) · 승률 {wr} ⠿</div>
       {items.length ? <div className="wrap">{ready && items.map((id, i) => <ItemPic key={i} id={id} owned={owned?.has(id)} />)}</div> : null}
       {build.skills.length ? (
@@ -203,22 +191,30 @@ function AugmentPanel() {
       { id: '3', name: '둔기', tier: 'C', desc: '', icon: '', champs: [] },
     ]);
   }, []);
+  const [open, setOpen] = useState(false); // collapsed by default so it doesn't cover the screen
   const shown = (list ?? []).filter((a) => !q || a.name.toLowerCase().includes(q.toLowerCase()));
   return (
-    <div className="card augment-panel" style={drag.style} {...capture}>
-      <div className="title" {...drag.handle}>증강 티어 (아수라장) ⠿</div>
-      <input className="aug-search" placeholder="증강 검색…" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="aug-list">
-        {list == null ? <div className="muted" style={{ fontSize: 11, padding: 6 }}>불러오는 중…</div>
-          : shown.length === 0 ? <div className="muted" style={{ fontSize: 11, padding: 6 }}>결과 없음</div>
-          : shown.map((a) => (
-            <div className="aug-row" key={a.id} title={a.desc}>
-              <span className="aug-tier" style={{ background: TIER_COLOR[a.tier] ?? '#888' }}>{a.tier}</span>
-              {a.icon ? <img className="aug-ic" src={a.icon} onError={(e) => ((e.currentTarget.style.display = 'none'))} /> : null}
-              <b style={{ fontSize: 12 }}>{a.name}</b>
-            </div>
-          ))}
+    <div className="card augment-panel" style={{ ...drag.style, width: open ? 290 : 'max-content' }}>
+      <div className="title aug-head" {...drag.handle}>
+        <span>증강 티어 (아수라장)</span>
+        <button className="aug-toggle" onPointerDown={(e) => e.stopPropagation()} onClick={() => setOpen((o) => !o)}>{open ? '▾ 닫기' : '▸ 열기'}</button>
       </div>
+      {open && (
+        <>
+          <input className="aug-search" placeholder="증강 검색…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="aug-list">
+            {list == null ? <div className="muted" style={{ fontSize: 11, padding: 6 }}>불러오는 중…</div>
+              : shown.length === 0 ? <div className="muted" style={{ fontSize: 11, padding: 6 }}>결과 없음</div>
+              : shown.map((a) => (
+                <div className="aug-row" key={a.id} title={a.desc}>
+                  <span className="aug-tier" style={{ background: TIER_COLOR[a.tier] ?? '#888' }}>{a.tier}</span>
+                  {a.icon ? <img className="aug-ic" src={a.icon} onError={(e) => ((e.currentTarget.style.display = 'none'))} /> : null}
+                  <b style={{ fontSize: 12 }}>{a.name}</b>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -227,7 +223,7 @@ function TopHud({ snap }: { snap: Snapshot }) {
   const o = snap.objectives;
   const drag = useDraggable('hud', { left: Math.round(window.innerWidth / 2 - 120), top: 12 });
   return (
-    <div className="card top-hud" style={drag.style} {...capture}>
+    <div className="card top-hud" style={drag.style} >
       <div className="row" style={{ gap: 10 }} {...drag.handle}>
         <span className="clock">{fmtClock(snap.game?.time ?? 0)}</span>
         <span className="muted" style={{ fontSize: 11 }}>{snap.game?.mode ?? ''}</span>
@@ -242,18 +238,22 @@ function App() {
   const [snap, setSnap] = useState<Snapshot | null>(demoSnap());
   const [build, setBuild] = useState<Build>(demoBuild());
   const [ready, setReady] = useState(false);
+  const [editing, setEditing] = useState(false);
   useEffect(() => {
     (async () => { await loadDDragonVersion(); await Promise.all([loadChampions(), loadSummonerSpells(), loadItemHaste(), loadRunes()]); setReady(true); })();
     if (window.cward) {
       setSnap(null); setBuild(null); // live mode: wait for real data
       window.cward.onSnapshot((s) => setSnap(s));
       window.cward.onReco((b) => setBuild(b));
+      window.cward.onEditMode?.((on) => setEditing(on));
       window.cward.ready();
     }
   }, []);
+  useEffect(() => { document.body.classList.toggle('editing', editing); }, [editing]);
 
+  const editBanner = editing ? <div className="edit-banner">편집 모드 · 패널을 드래그해 배치 · ⌘⇧E로 잠금</div> : null;
   const inGame = snap && (snap.kind === 'ingame' || snap.kind === 'champselect') && (snap.players?.length || snap.kind === 'champselect');
-  if (!inGame) return <div className="idle">cward · 대기 중{snap?.kind ? ` (${snap.kind})` : ''}</div>;
+  if (!inGame) return <>{editBanner}<div className="idle">cward · 대기 중{snap?.kind ? ` (${snap.kind})` : ''}</div></>;
 
   const players = snap!.players ?? [];
   const me = players.find((p) => p.riotId === snap!.active?.riotId);
@@ -263,6 +263,7 @@ function App() {
   }
   return (
     <>
+      {editBanner}
       <TopHud snap={snap!} />
       <SpellTracker enemies={enemies} ready={ready} />
       {build?.skills?.length ? <SkillHighlight abilities={snap!.active?.abilities} skills={build.skills} /> : null}

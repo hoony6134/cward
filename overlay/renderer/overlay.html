@@ -73,6 +73,11 @@
     .aug-row:first-child { border-top: 0; }
     .aug-tier { font-size: 11px; font-weight: 800; color: #0a1120; padding: 1px 0; border-radius: 4px; flex-shrink: 0; width: 20px; text-align: center; }
     .aug-ic { width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0; }
+    .aug-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .aug-toggle { background: transparent; border: 0; color: #9ec1ff; font-size: 10px; cursor: pointer; padding: 0 2px; }
+    /* Edit mode: whole overlay catches the mouse so panels can be dragged. */
+    .edit-banner { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); background: #1b4bd6; color: #fff; font: 700 12px -apple-system, "Apple SD Gothic Neo", sans-serif; padding: 5px 12px; border-radius: 8px; z-index: 999; }
+    body.editing .card { outline: 1px dashed rgba(120,160,230,.7); }
     .cname { font-size: 11px; width: 46px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .wrap { display: flex; gap: 4px; flex-wrap: wrap; }
     .idle { position: fixed; top: 12px; right: 12px; font-size: 11px; color: #8aa0b8; }

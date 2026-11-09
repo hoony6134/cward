@@ -8,6 +8,6 @@ contextBridge.exposeInMainWorld('cward', {
   // Overlay window: live snapshot + build recommendation stream.
   onSnapshot: (cb) => ipcRenderer.on('snapshot', (_e, s) => cb(s)),
   onReco: (cb) => ipcRenderer.on('reco', (_e, r) => cb(r)),
-  setMouseIgnore: (ignore) => ipcRenderer.send('overlay:mouse-ignore', ignore),
+  onEditMode: (cb) => ipcRenderer.on('editmode', (_e, on) => cb(on)),
   getAugments: () => ipcRenderer.invoke('augments:get'),
 });

@@ -77,6 +77,7 @@ function buildTray() {
   const menu = Menu.buildFromTemplate([
     { label: '폰 연동 QR 보기', click: showPairing },
     { label: '오버레이 표시/숨기기  ⌘⇧O', click: () => toggleOverlay() },
+    { label: '위치 편집 모드  ⌘⇧E', click: () => setEditMode(!editMode) },
     { type: 'separator' },
     { label: '종료', click: () => app.quit() },
   ]);
@@ -95,10 +96,11 @@ function createOverlay() {
     transparent: true, frame: false, hasShadow: false,
     resizable: false, movable: false, skipTaskbar: true,
     focusable: false, show: false, fullscreenable: false, enableLargerThanScreen: true,
-    // Non-activating panel: stays visible when the game is focused AND clicking/
-    // dragging it does not steal focus from the game. (A regular window does both
-    // wrong here.) No 'hide' re-show handler → no churn / ping spikes.
-    type: 'panel',
+    // Regular window (NOT a panel): a panel has hidesOnDeactivate, so it only shows
+    // while OUR app is active — i.e. it vanishes whenever the game is focused. A
+    // regular window has no such behavior, so it stays visible. During play the
+    // overlay is fully click-through (edit mode off), so our app never activates and
+    // never steals the game's focus; dragging happens only in edit mode (⌘⇧E).
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
@@ -124,11 +126,17 @@ function toggleOverlay() {
   setOverlayShown(show);
 }
 
-// Renderer toggles mouse capture as the pointer moves on/off a clickable panel,
-// so only the panels catch clicks and the rest of the screen stays click-through.
-ipcMain.on('overlay:mouse-ignore', (_e, ignore) => {
-  if (overlayWin && !overlayWin.isDestroyed()) overlayWin.setIgnoreMouseEvents(!!ignore, { forward: true });
-});
+// Edit mode: normally the overlay is fully click-through (never intercepts a game
+// click, so it can't steal focus or get hidden). Toggling edit mode makes the whole
+// overlay catch the mouse so you can drag panels; toggle off to play again.
+let editMode = false;
+function setEditMode(on) {
+  editMode = on;
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  overlayWin.setIgnoreMouseEvents(!on, { forward: true });
+  if (on) setOverlayShown(true);
+  overlayWin.webContents.send('editmode', on);
+}
 
 // ARAM: Mayhem augment reference (name/tier/description) for the overlay.
 ipcMain.handle('augments:get', () => getAugments());
@@ -186,6 +194,7 @@ async function updateReco(snap) {
 
 function registerShortcuts() {
   globalShortcut.register('CommandOrControl+Shift+O', () => toggleOverlay());
+  globalShortcut.register('CommandOrControl+Shift+E', () => setEditMode(!editMode));
 }
 
 function trayIcon() {

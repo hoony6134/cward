@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, loadItemHaste, loadRunes,
-  champIcon, champIconById, champ, spellIcon, spellIconByName, fmtClock, spellCd, loadUltCd, ultRank, itemHaste, withHaste,
-  itemIcon, perkIcon, sumSpellIcon, loadAbilityIcons,
+  champIcon, champIconById, champ, spellIcon, fmtClock, spellCd, loadUltCd, ultRank, itemHaste, withHaste,
+  itemIcon, perkIcon, sumSpellIcon,
 } from '@web/ddragon';
 import type { Snapshot, Player } from '@web/useRelay';
 
@@ -92,7 +92,7 @@ function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean })
             {ready && <img className="champ" src={champIcon(p.champKey)} alt={p.champion} />}
             <div className="wrap">
               {p.spells.map((s, i) => (s?.key || s?.name) ? (
-                <Chip key={i} icon={ready ? (spellIconByName(s.name) || spellIcon(s.key)) : ''} left={left(`${p.riotId}:s${i}`)}
+                <Chip key={i} icon={ready && s.key ? spellIcon(s.key) : ''} left={left(`${p.riotId}:s${i}`)}
                   label={(s.name || s.key || '').slice(0, 2)} title={s.name || s.key} onClick={() => toggle(`${p.riotId}:s${i}`, spellCd(s.key))} />
               ) : null)}
               <Chip label="R" left={left(`${p.riotId}:R`)} title={`궁 ${rCd(p)}초`} onClick={() => toggle(`${p.riotId}:R`, rCd(p))} />
@@ -123,24 +123,20 @@ function maxOrder(order: string[]): string[] {
   return ['Q', 'W', 'E'].sort((a, b) => c[b][0] - c[a][0] || c[a][1] - c[b][1]);
 }
 
-// The player's Q/W/E/R ability icons with the next-to-level one highlighted (pink).
-// Drag it next to the game's own skill bar.
-function AbilityBar({ champKey, abilities, skills, ready }: { champKey: string; abilities?: { Q: number; W: number; E: number; R: number } | null; skills: string[]; ready: boolean }) {
-  const [icons, setIcons] = useState<{ Q: string; W: string; E: string; R: string } | null>(null);
-  useEffect(() => { if (champKey) loadAbilityIcons(champKey).then(setIcons); }, [champKey]);
-  const drag = useDraggable('ability', { left: Math.round(window.innerWidth / 2 - 96), top: window.innerHeight - 150 });
+// A translucent ring that sits ON TOP of the game's own Q/W/E/R skill icons and
+// highlights the next one to level (pink). The cells are click-through (they don't
+// block pressing skills); you position the strip once with the small grip. No panel,
+// no extra space.
+function SkillHighlight({ abilities, skills }: { abilities?: { Q: number; W: number; E: number; R: number } | null; skills: string[] }) {
+  const drag = useDraggable('skillhl', { left: Math.round(window.innerWidth / 2 - 112), top: window.innerHeight - 96 });
   const spent = abilities ? abilities.Q + abilities.W + abilities.E + abilities.R : 0;
-  const next = skills[spent]; // which ability to level with the next point
-  const keys = ['Q', 'W', 'E', 'R'] as const;
+  const next = skills[spent];
   return (
-    <div className="card ability-bar" style={drag.style} {...capture}>
-      <div className="title" {...drag.handle}>스킬 추천 ⠿</div>
-      <div className="row" style={{ gap: 6 }}>
-        {keys.map((k) => (
-          <div className={`abil${next === k ? ' next' : ''}`} key={k}>
-            {ready && icons?.[k] ? <img src={icons[k]} alt={k} /> : <span className="abil-l">{k}</span>}
-            <span className="abil-k">{k}{abilities ? abilities[k] : 0}</span>
-          </div>
+    <div className="skill-hl" style={drag.style}>
+      <div className="hl-grip" {...capture} {...drag.handle} title="드래그해서 스킬바에 맞추세요">⠿ 선마</div>
+      <div className="hl-cells">
+        {(['Q', 'W', 'E', 'R'] as const).map((k) => (
+          <div className={`hl-cell${next === k ? ' next' : ''}`} key={k}><span className="hl-k">{k}</span></div>
         ))}
       </div>
     </div>
@@ -149,18 +145,40 @@ function AbilityBar({ champKey, abilities, skills, ready }: { champKey: string; 
 
 // Recommended build. In-game: items only (what to buy). Champ select (full): also
 // skill order, runes and summoner spells — the things you set at the pick screen.
-function BuildDock({ build, ready, full }: { build: NonNullable<Build>; ready: boolean; full?: boolean }) {
-  const wr = build.winRate != null ? ` · 승률 ${Math.round(build.winRate * 100)}%` : '';
+// One recommended item picture; grayed with a ✓ when the player already owns it.
+function ItemPic({ id, owned }: { id: number; owned?: boolean }) {
+  return (
+    <span className="itm-w">
+      <img className={`itm${owned ? ' owned' : ''}`} src={itemIcon(id)} />
+      {owned && <span className="itm-chk">✓</span>}
+    </span>
+  );
+}
+
+function BuildDock({ build, ready, full, owned }: { build: NonNullable<Build>; ready: boolean; full?: boolean; owned?: Set<number> }) {
   const items = [...(build.items?.ids ?? []), ...build.boots];
-  const drag = useDraggable('build', { left: Math.max(0, window.innerWidth - 314), top: Math.max(0, window.innerHeight - 230) });
+  const wr = build.winRate != null ? `${Math.round(build.winRate * 100)}%` : '';
+  const drag = useDraggable('build', { left: Math.max(0, window.innerWidth - 240), top: Math.max(0, window.innerHeight - 170) });
+
+  // In-game: clean — just the item pictures and the win rate. Whole card drags.
+  if (!full) {
+    return (
+      <div className="card build-clean" style={drag.style} {...capture} {...drag.handle}>
+        {ready && items.map((id, i) => <ItemPic key={i} id={id} owned={owned?.has(id)} />)}
+        {wr && <span className="wr">{wr}</span>}
+      </div>
+    );
+  }
+
+  // Champ select: full set (items, skill order, runes, spells) for pick-time setup.
   return (
     <div className="card build-dock" style={drag.style} {...capture}>
-      <div className="title" {...drag.handle}>추천 {full ? '빌드' : '아이템'} · OP.GG ({build.mode}){wr} ⠿</div>
-      {items.length ? <div className="wrap">{ready && items.map((id, i) => <img key={i} className="itm" src={itemIcon(id)} />)}</div> : null}
-      {full && build.skills.length ? (
+      <div className="title" {...drag.handle}>추천 빌드 · OP.GG ({build.mode}) · 승률 {wr} ⠿</div>
+      {items.length ? <div className="wrap">{ready && items.map((id, i) => <ItemPic key={i} id={id} owned={owned?.has(id)} />)}</div> : null}
+      {build.skills.length ? (
         <div style={{ marginTop: 8 }}><span className="muted" style={{ fontSize: 10 }}>선마 </span><b style={{ color: '#e9c877', fontSize: 12 }}>{maxOrder(build.skills).join(' › ')}</b></div>
       ) : null}
-      {full && (build.runes || build.spells.length) ? (
+      {(build.runes || build.spells.length) ? (
         <div className="row" style={{ gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
           {build.runes && ready ? <span className="wrap">{[...build.runes.primary.slice(0, 1), ...build.runes.secondary.slice(0, 1)].map((id, i) => <img key={i} className="rune" src={perkIcon(id)} />)}</span> : null}
           {build.spells.length && ready ? <span className="wrap">{build.spells.map((id, i) => { const s = sumSpellIcon(id); return s ? <img key={i} className="sp" src={s} /> : null; })}</span> : null}
@@ -246,8 +264,8 @@ function App() {
     <>
       <TopHud snap={snap!} />
       <SpellTracker enemies={enemies} ready={ready} />
-      {me?.champKey && build?.skills?.length ? <AbilityBar champKey={me.champKey} abilities={snap!.active?.abilities} skills={build.skills} ready={ready} /> : null}
-      {build && <BuildDock build={build} ready={ready} />}
+      {build?.skills?.length ? <SkillHighlight abilities={snap!.active?.abilities} skills={build.skills} /> : null}
+      {build && <BuildDock build={build} ready={ready} owned={new Set((me?.items ?? []).map((it) => it.id))} />}
       {snap!.game?.mode === 'KIWI' && <AugmentPanel />}
     </>
   );
@@ -256,15 +274,15 @@ function App() {
 // ---- demo data (browser preview only; replaced by live data when window.cward exists) ----
 function demoSnap(): Snapshot | null {
   if (window.cward) return null;
-  const mk = (riotId: string, champion: string, champKey: string, team: 'ORDER' | 'CHAOS', spells: string[]): Player => ({
+  const mk = (riotId: string, champion: string, champKey: string, team: 'ORDER' | 'CHAOS', spells: string[], items: { id: number; name: string; count: number }[] = []): Player => ({
     riotId, name: riotId, champion, champKey, team, position: '', level: 11, isBot: false, dead: false, respawn: 0,
-    k: 3, d: 2, a: 5, cs: 120, ward: 2, spells: spells.map((k) => ({ name: k, key: k })), items: [],
+    k: 3, d: 2, a: 5, cs: 120, ward: 2, spells: spells.map((k) => ({ name: k, key: k })), items,
   });
   return {
     kind: 'ingame', t: Date.now(), phase: 'InProgress', game: { mode: 'KIWI', mapId: 12, time: 723 },
     active: { riotId: 'me#KR1', level: 6, gold: 2450, hp: 1400, maxHp: 1800, resourceType: 'MANA', res: 300, maxRes: 600, abilities: { Q: 3, W: 1, E: 1, R: 1 } },
     players: [
-      mk('me#KR1', 'Annie', 'Annie', 'ORDER', ['Flash', 'Dot']),
+      mk('me#KR1', 'Annie', 'Annie', 'ORDER', ['Flash', 'Dot'], [{ id: 3118, name: '', count: 1 }]),
       mk('A#KR', 'Ezreal', 'Ezreal', 'CHAOS', ['Flash', 'Heal']),
       mk('B#KR', 'Fiddlesticks', 'FiddleSticks', 'CHAOS', ['Flash', 'Teleport']),
       mk('C#KR', 'Caitlyn', 'Caitlyn', 'CHAOS', ['Flash', 'Heal']),

@@ -43,6 +43,9 @@
     .chip .cd { position: absolute; inset: 0; display: grid; place-items: center; font: 700 11px ui-monospace, monospace; color: #fff; }
     .chip .chip-l { font: 700 9px -apple-system, "Apple SD Gothic Neo", sans-serif; }
     .itm { width: 30px; height: 30px; border-radius: 6px; border: 1px solid rgba(120,150,190,.3); flex-shrink: 0; }
+    .itm-w { position: relative; display: inline-block; line-height: 0; flex-shrink: 0; }
+    .itm.owned { filter: grayscale(1) brightness(.4); }
+    .itm-chk { position: absolute; inset: 0; display: grid; place-items: center; font: 800 15px -apple-system, sans-serif; color: #5ad17a; text-shadow: 0 0 3px #000, 0 0 3px #000; pointer-events: none; }
     .rune { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(120,150,190,.3); flex-shrink: 0; }
     .sp { width: 24px; height: 24px; border-radius: 5px; flex-shrink: 0; }
 
@@ -52,12 +55,17 @@
     .sk { font: 700 10px ui-monospace, monospace; width: 15px; height: 16px; display: inline-grid; place-items: center; border-radius: 3px; background: #1a2740; color: #cdd9ea; }
     .sk.done { opacity: .35; }
     .sk.next { background: #ff4fa3; color: #fff; box-shadow: 0 0 0 1px #ff4fa3; }
-    .ability-bar { position: fixed; }
-    .abil { position: relative; width: 38px; height: 38px; border-radius: 7px; overflow: hidden; border: 1px solid rgba(120,150,190,.3); background: #122235; flex-shrink: 0; }
-    .abil img { width: 100%; height: 100%; }
-    .abil.next { border-color: #ff4fa3; box-shadow: 0 0 0 2px #ff4fa3, 0 0 12px rgba(255,79,163,.7); }
-    .abil-l { display: grid; place-items: center; width: 100%; height: 100%; font: 700 14px ui-monospace, monospace; color: #cdd9ea; }
-    .abil-k { position: absolute; bottom: 0; right: 0; font: 700 9px ui-monospace, monospace; background: rgba(0,0,0,.65); padding: 0 3px; border-radius: 4px 0 0 0; }
+    /* Skill highlight: transparent rings laid over the game's own skill icons. */
+    .skill-hl { position: fixed; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+    .hl-grip { pointer-events: auto; cursor: move; font: 700 10px -apple-system, "Apple SD Gothic Neo", sans-serif; color: #e9c877;
+      background: rgba(10,17,28,.85); border: 1px solid rgba(90,120,160,.3); border-radius: 6px; padding: 2px 7px; margin-bottom: 5px; }
+    .hl-cells { display: flex; gap: 6px; }
+    .hl-cell { width: 50px; height: 50px; border-radius: 9px; border: 1px solid rgba(140,160,190,.18); position: relative; }
+    .hl-cell.next { border-color: #ff4fa3; box-shadow: 0 0 0 2px #ff4fa3, 0 0 16px rgba(255,79,163,.85); }
+    .hl-k { position: absolute; top: 2px; left: 4px; font: 700 9px ui-monospace, monospace; color: rgba(230,237,246,.4); }
+    /* Clean in-game item dock: just pictures + win rate. */
+    .build-clean { display: flex; align-items: center; gap: 5px; cursor: move; padding: 6px 8px; }
+    .build-clean .wr { font-size: 12px; font-weight: 700; color: #e9c877; margin-left: 4px; }
     .augment-panel { position: fixed; width: 300px; }
     .aug-search { width: 100%; margin: 4px 0 6px; background: #0e1626; border: 1px solid #1c2a40; border-radius: 8px; color: #e6edf6; font-size: 12px; padding: 5px 8px; outline: none; }
     .aug-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }

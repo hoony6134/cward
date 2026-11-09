@@ -27,7 +27,7 @@ declare global {
   }
 }
 
-type Augment = { name: string; desc: string; tier: string };
+type Augment = { id: string; name: string; tier: string; desc: string; icon: string; champs: string[] };
 
 // When a panel captures clicks, the full-screen window must briefly stop ignoring
 // the mouse while the pointer is over it; otherwise clicks fall through to the game.
@@ -170,13 +170,8 @@ function BuildDock({ build, ready, full }: { build: NonNullable<Build>; ready: b
   );
 }
 
-// ARAM: Mayhem augment reference — searchable, grouped by rarity grade. (Win-rate
-// S/A/B/C tiers have no clean data source, so this shows Riot's rarity + what each does.)
-const TIER_KO: Record<string, { ko: string; color: string }> = {
-  Prismatic: { ko: '프리즘', color: '#d98cff' },
-  Gold: { ko: '골드', color: '#e9c877' },
-  Silver: { ko: '실버', color: '#c7d2dd' },
-};
+// ARAM: Mayhem augment tier list (S/A/B/C/D) — which augments are good, from Blitz.
+const TIER_COLOR: Record<string, string> = { S: '#ff5d73', A: '#ff9f43', B: '#e9c877', C: '#6aa6e6', D: '#8aa0b8' };
 function AugmentPanel() {
   const [list, setList] = useState<Augment[] | null>(null);
   const [q, setQ] = useState('');
@@ -184,26 +179,24 @@ function AugmentPanel() {
   useEffect(() => {
     if (window.cward) { window.cward.getAugments().then((a) => setList(a)); return; }
     setList([ // browser-preview demo only
-      { name: 'Back to Basics', tier: 'Prismatic', desc: '챔피언 스킬 피해 35% 증가, 주문 가속 70, 회복·보호막 35% 증가. 단 궁극기 영구 잠금.' },
-      { name: 'Jeweled Gauntlet', tier: 'Gold', desc: '스킬이 치명타로 적중할 수 있습니다.' },
-      { name: 'Blunt Force', tier: 'Silver', desc: '공격력 20% 증가.' },
+      { id: '1', name: '거인', tier: 'S', desc: '', icon: '', champs: [] },
+      { id: '2', name: '보석 장식 건틀릿', tier: 'A', desc: '', icon: '', champs: [] },
+      { id: '3', name: '둔기', tier: 'C', desc: '', icon: '', champs: [] },
     ]);
   }, []);
-  const shown = (list ?? []).filter((a) => !q || a.name.toLowerCase().includes(q.toLowerCase()) || a.desc.toLowerCase().includes(q.toLowerCase()));
+  const shown = (list ?? []).filter((a) => !q || a.name.toLowerCase().includes(q.toLowerCase()));
   return (
     <div className="card augment-panel" style={drag.style} {...capture}>
-      <div className="title" {...drag.handle}>증강 설명 ⠿</div>
+      <div className="title" {...drag.handle}>증강 티어 (아수라장) ⠿</div>
       <input className="aug-search" placeholder="증강 검색…" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="aug-list">
         {list == null ? <div className="muted" style={{ fontSize: 11, padding: 6 }}>불러오는 중…</div>
           : shown.length === 0 ? <div className="muted" style={{ fontSize: 11, padding: 6 }}>결과 없음</div>
-          : shown.map((a, i) => (
-            <div className="aug-row" key={i}>
-              <div className="row" style={{ gap: 6 }}>
-                <span className="aug-tier" style={{ background: (TIER_KO[a.tier]?.color ?? '#888') }}>{TIER_KO[a.tier]?.ko ?? a.tier}</span>
-                <b style={{ fontSize: 12 }}>{a.name}</b>
-              </div>
-              <div className="aug-desc">{a.desc}</div>
+          : shown.map((a) => (
+            <div className="aug-row" key={a.id} title={a.desc}>
+              <span className="aug-tier" style={{ background: TIER_COLOR[a.tier] ?? '#888' }}>{a.tier}</span>
+              {a.icon ? <img className="aug-ic" src={a.icon} onError={(e) => ((e.currentTarget.style.display = 'none'))} /> : null}
+              <b style={{ fontSize: 12 }}>{a.name}</b>
             </div>
           ))}
       </div>

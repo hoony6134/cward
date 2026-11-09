@@ -1,5 +1,5 @@
 {
-  "name": "ward-web",
+  "name": "cward-web",
   "private": true,
   "type": "module",
   "scripts": {

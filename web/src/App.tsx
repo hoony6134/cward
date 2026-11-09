@@ -45,7 +45,7 @@ export default function App() {
       <div className="sticky top-0 z-10 bg-[#070d16]/90 backdrop-blur border-b hair" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="topbar">{status !== '연결됨' && <i />}</div>
         <header className="flex items-center gap-2 px-4 py-3">
-        <span className="font-hud text-xl font-bold text-[var(--gold)]">WARD</span>
+        <span className="font-hud text-xl font-bold text-[var(--gold)]">CWARD</span>
         <span className="text-xs text-[var(--muted)] tracking-wide">{headerLabel(snap)}</span>
         {snap?.me?.name && ready && kind !== 'ingame' && (
           <span className="flex items-center gap-1.5 ml-1 min-w-0">
@@ -1065,7 +1065,7 @@ function Searching({ snap, send }: { snap: Snapshot; send: (c: Command) => void 
 function Waiting({ status, clientOff, phase }: { status: string; clientOff: boolean; phase?: string | null }) {
   return (
     <div className="flex flex-col items-center justify-center text-center gap-2 mt-24 px-6">
-      <div className="font-hud text-3xl text-[var(--gold)]">WARD</div>
+      <div className="font-hud text-3xl text-[var(--gold)]">CWARD</div>
       <p className="text-[var(--text)] font-medium mt-2">{clientOff ? 'PC 클라이언트 꺼짐' : '대기 중'}</p>
       <p className="text-sm text-[var(--muted)]">{clientOff ? 'PC에서 롤 클라이언트를 켜면 자동으로 연결돼요.' : '게임을 시작하면 자동으로 표시돼요.'}</p>
       <p className="text-xs text-[var(--muted)]/60">서버 연결: {status}{clientOff || !phase ? '' : ` · ${phase}`}</p>
@@ -1080,7 +1080,7 @@ function Pairing() {
   return (
     <div className="min-h-dvh grid place-items-center px-6 text-center">
       <div className="space-y-4 max-w-sm w-full">
-        <div className="font-hud text-4xl text-[var(--gold)]">WARD</div>
+        <div className="font-hud text-4xl text-[var(--gold)]">CWARD</div>
         <h1 className="text-xl font-bold">페어링</h1>
         <p className="text-sm text-[var(--muted)]">PC에서 <code className="text-[var(--text)]">npm run qr</code>로 나온 <b>페어링 링크를 복사해 아래에 붙여넣으세요.</b> (설치형 앱은 링크가 자동으로 안 넘어와요.)</p>
         <input value={v} onChange={(e) => { setV(e.target.value); setErr(false); }} placeholder="페어링 링크 붙여넣기"

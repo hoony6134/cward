@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const DEFAULT_RELAY = 'wss://relay.ward.gg.scian.xyz/ws';
+const DEFAULT_RELAY = 'wss://relay.cward.gg.scian.xyz/ws';
 const envPath = path.join(import.meta.dirname, '.env');
 
 if (fs.existsSync(envPath)) {

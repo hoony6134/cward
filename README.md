@@ -26,7 +26,7 @@ npm run deploy                        # 출력된 https://...workers.dev 주소 
 ```bash
 cd web && npm install
 echo 'VITE_RELAY_WS_URL=wss://relay.<your-domain>/ws' > .env   # 1번 Worker 주소
-npm run deploy   # build 후 wrangler deploy (ward-web Worker). 도메인/라우트는 web/wrangler.jsonc 참고
+npm run deploy   # build 후 wrangler deploy (cward-web Worker). 도메인/라우트는 web/wrangler.jsonc 참고
 ```
 
 ## 3. 로컬 에이전트 (agent)
@@ -41,13 +41,13 @@ npm start
 
 ### 친구용: 바이너리 다운로드 (Node 설치 불필요)
 
-[Releases](../../releases) 에서 OS에 맞는 파일을 받아 실행하면 끝 — 첫 실행 때 방·토큰이 자동 생성되고(`ward.config.json`), 폰 연결 QR이 콘솔에 뜹니다. 게임 전엔 그 파일만 다시 실행.
+[Releases](../../releases) 에서 OS에 맞는 파일을 받아 실행하면 끝 — 첫 실행 때 방·토큰이 자동 생성되고(`cward.config.json`), 폰 연결 QR이 콘솔에 뜹니다. 게임 전엔 그 파일만 다시 실행.
 
-- **Windows**: `ward-agent-windows-x64.exe` 더블클릭. "Windows의 PC 보호" 경고 → **추가 정보 → 실행**.
+- **Windows**: `cward-agent-windows-x64.exe` 더블클릭. "Windows의 PC 보호" 경고 → **추가 정보 → 실행**.
 - **macOS** (서명 없는 파일이라 격리 해제 필요, Intel 맥은 `-x64`):
   ```bash
-  xattr -dr com.apple.quarantine ~/Downloads/ward-agent-macos-arm64
-  chmod +x ~/Downloads/ward-agent-macos-arm64 && ~/Downloads/ward-agent-macos-arm64
+  xattr -dr com.apple.quarantine ~/Downloads/cward-agent-macos-arm64
+  chmod +x ~/Downloads/cward-agent-macos-arm64 && ~/Downloads/cward-agent-macos-arm64
   ```
 
 > 릴리스 자동화: `git tag v1.0.0 && git push --tags` 하면 GitHub Actions(`.github/workflows/release.yml`)가 위 바이너리들을 빌드해 Release에 올립니다.

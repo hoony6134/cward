@@ -1,10 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ward-relay",
+  "name": "cward-relay",
   "main": "src/index.ts",
   "compatibility_date": "2025-10-01",
   "observability": { "enabled": true },
-  "routes": [{ "pattern": "relay.ward.gg.scian.xyz", "custom_domain": true }],
+  "routes": [{ "pattern": "relay.cward.gg.scian.xyz", "custom_domain": true }],
   "durable_objects": {
     "bindings": [{ "name": "ROOM", "class_name": "RelayRoom" }]
   },

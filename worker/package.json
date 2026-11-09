@@ -1,5 +1,5 @@
 {
-  "name": "ward-relay",
+  "name": "cward-relay",
   "private": true,
   "type": "module",
   "scripts": {

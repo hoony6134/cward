@@ -1,13 +1,13 @@
 // Resolves agent config. Dev: from env (npm start uses --env-file=.env).
-// Standalone binary (bun --compile): a ward.config.json beside the executable,
+// Standalone binary (bun --compile): a cward.config.json beside the executable,
 // created with a fresh random room+token on first run — nothing to set up.
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import qrcode from 'qrcode-terminal';
 
-const DEFAULT_RELAY = 'wss://relay.ward.gg.scian.xyz/ws';
-const DEFAULT_WEB = 'https://ward.gg.scian.xyz';
+const DEFAULT_RELAY = 'wss://relay.cward.gg.scian.xyz/ws';
+const DEFAULT_WEB = 'https://cward.gg.scian.xyz';
 const compiled = typeof Bun !== 'undefined'; // the Bun global exists only in a bun-compiled binary
 
 export function loadConfig() {
@@ -19,7 +19,7 @@ export function loadConfig() {
     console.error('설정이 없습니다. 먼저  npm run init  을 실행하세요.');
     process.exit(1);
   }
-  const p = path.join(path.dirname(process.execPath), 'ward.config.json');
+  const p = path.join(path.dirname(process.execPath), 'cward.config.json');
   if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
   const cfg = { relay: DEFAULT_RELAY, room: randomUUID(), token: randomUUID(), web: DEFAULT_WEB };
   fs.writeFileSync(p, JSON.stringify(cfg, null, 2));

@@ -20,7 +20,6 @@ let cfg = null;
 let pairData = null;          // { link, qr }
 let latestSnap = null;
 let agent = null;
-let overlayManual = null;     // null = auto (show only in-game); true/false = user override
 let activeMiss = 0;           // consecutive non-active snapshots (debounces auto-hide)
 let overlayShouldShow = false; // what WE want; distinguishes our hide from a system hide
 
@@ -46,13 +45,8 @@ app.whenReady().then(async () => {
       // shown (this was making it vanish during fights). Only a real idle state hides it.
       const inProgress = s.kind === 'menu' && s.phase === 'InProgress';
       const active = s.kind === 'ingame' || s.kind === 'champselect' || inProgress;
-      if (active) {
-        activeMiss = 0;
-        if (overlayManual !== false) setOverlayShown(true);
-      } else if (++activeMiss >= 6) { // ~12s of sustained idle before auto-hiding
-        setOverlayShown(false);
-        overlayManual = null;
-      }
+      if (active) { activeMiss = 0; setOverlayShown(true); }
+      else if (++activeMiss >= 6) setOverlayShown(false); // ~12s sustained idle before hiding
       if (s.kind === 'ingame' || s.kind === 'champselect') updateReco(s);
     },
     onStatus: (s) => { if (tray) tray.setToolTip(`cward — relay ${s}`); },
@@ -61,7 +55,7 @@ app.whenReady().then(async () => {
   createOverlay();
   buildTray();
   registerShortcuts();
-  if (process.env.CWARD_SHOW_OVERLAY) { overlayManual = true; setOverlayShown(true); } // manual smoke test
+  if (process.env.CWARD_SHOW_OVERLAY) setOverlayShown(true); // manual smoke test
   if (cfg.created) showPairing(); // first run: guide the user to pair the phone
 });
 
@@ -77,7 +71,6 @@ function buildTray() {
   tray.setToolTip('cward');
   const menu = Menu.buildFromTemplate([
     { label: '폰 연동 QR 보기', click: showPairing },
-    { label: '오버레이 표시/숨기기  ⌘⇧O', click: () => toggleOverlay() },
     { label: '위치 편집 모드  ⌘⇧E', click: () => setEditMode(!editMode) },
     { type: 'separator' },
     { label: '종료', click: () => app.quit() },
@@ -96,7 +89,10 @@ function createOverlay() {
     x: workArea.x, y: workArea.y, width: workArea.width, height: workArea.height,
     transparent: true, frame: false, hasShadow: false,
     resizable: false, movable: false, skipTaskbar: true,
-    focusable: false, show: false, fullscreenable: false, enableLargerThanScreen: true,
+    // NOTE: focusable stays true. A focusable:false window is ordered out by macOS
+    // when the app deactivates (clicking the game) → the overlay vanished on click.
+    // It's click-through during play anyway, so it never actually takes focus.
+    show: false, fullscreenable: false, enableLargerThanScreen: true,
     // Regular window (NOT a panel): a panel has hidesOnDeactivate, so it only shows
     // while OUR app is active — i.e. it vanishes whenever the game is focused. A
     // regular window has no such behavior, so it stays visible. During play the
@@ -107,6 +103,13 @@ function createOverlay() {
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
   overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWin.setIgnoreMouseEvents(true, { forward: true }); // click-through; panels toggle capture on hover
+  // If macOS orders our window out while we want it shown (it does this occasionally
+  // when the app deactivates), bring it straight back. Our own hides clear
+  // overlayShouldShow first, so those are respected. Regular windows get this event
+  // rarely, so there's no hide/show churn.
+  overlayWin.on('hide', () => {
+    if (overlayShouldShow && !editMode && overlayWin && !overlayWin.isDestroyed()) overlayWin.showInactive();
+  });
   overlayWin.webContents.on('did-finish-load', () => console.log('[overlay] loaded'));
   overlayWin.webContents.on('did-fail-load', (_e, code, desc) => console.log('[overlay] load failed', code, desc));
   overlayWin.loadFile(path.join(__dirname, '../renderer-dist/overlay.html'));
@@ -118,13 +121,6 @@ function setOverlayShown(show) {
   overlayShouldShow = show; // record intent BEFORE hide(), so the 'hide' handler won't fight it
   if (show && !overlayWin.isVisible()) overlayWin.showInactive();
   else if (!show && overlayWin.isVisible()) overlayWin.hide();
-}
-
-function toggleOverlay() {
-  if (!overlayWin || overlayWin.isDestroyed()) createOverlay();
-  const show = !overlayWin.isVisible();
-  overlayManual = show; // user override sticks until they toggle again
-  setOverlayShown(show);
 }
 
 // Edit mode: normally the overlay is fully click-through (never intercepts a game
@@ -194,7 +190,6 @@ async function updateReco(snap) {
 }
 
 function registerShortcuts() {
-  globalShortcut.register('CommandOrControl+Shift+O', () => toggleOverlay());
   globalShortcut.register('CommandOrControl+Shift+E', () => setEditMode(!editMode));
 }
 

@@ -5,12 +5,12 @@
   "author": "JeongHoon Lim <hoony6134@gmail.com>",
   "type": "module",
   "description": "cward macOS menu-bar app: phone pairing (no terminal) + in-game overlay",
-  "main": "build/main.mjs",
+  "main": "src/main.mjs",
   "scripts": {
     "bundle:main": "esbuild src/main.mjs --bundle --platform=node --format=esm --packages=external --outfile=build/main.mjs && cp src/preload.cjs build/preload.cjs",
     "build:renderer": "vite build",
     "build": "npm run bundle:main && npm run build:renderer",
-    "start": "pkill -f 'ward/overlay/node_modules/electron' 2>/dev/null; sleep 0.3; npm run build && electron .",
+    "start": "pkill -f 'ward/overlay/node_modules/electron' 2>/dev/null; sleep 0.3; npm run build:renderer && electron .",
     "dist": "npm run build && electron-builder"
   },
   "dependencies": {
@@ -32,6 +32,7 @@
   "build": {
     "appId": "xyz.scian.cward",
     "productName": "cward",
+    "extraMetadata": { "main": "build/main.mjs" },
     "files": ["build/**", "renderer/**", "renderer-dist/**"],
     "mac": {
       "category": "public.app-category.utilities",

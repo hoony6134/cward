@@ -22,13 +22,18 @@ let agent = null;
 let overlayManual = null;     // null = auto (show only in-game); true/false = user override
 let overlayInteractive = false;
 let activeMiss = 0;           // consecutive non-active snapshots (debounces auto-hide)
+let overlayShouldShow = false; // what WE want; distinguishes our hide from a system hide
 
 // Single instance only — a second launch just reveals pairing.
 if (!app.requestSingleInstanceLock()) { app.quit(); }
 app.on('second-instance', () => showPairing());
 
 app.whenReady().then(async () => {
-  app.dock?.hide(); // menu-bar app
+  // NOTE: do NOT app.dock.hide() here. A dock-hidden (accessory) app has macOS
+  // order its windows out when it's deactivated (i.e. when you click the game),
+  // which made the overlay vanish on click. Keeping a normal activation policy
+  // keeps the always-on-top overlay visible. (A dock icon shows; we can hide it
+  // properly later via LSUIElement in the packaged build.)
   cfg = loadConfig(app.getPath('userData'));
   pairData = { link: pairingLink(cfg), qr: await QRCode.toDataURL(pairingLink(cfg), { margin: 1, width: 320 }) };
 
@@ -88,14 +93,25 @@ function createOverlay() {
     transparent: true, frame: false, hasShadow: false,
     resizable: false, movable: true, skipTaskbar: true,
     focusable: false, show: false, fullscreenable: false,
-    // non-activating floating panel: stays above and visible when you click the
-    // game, instead of being ordered out like an ordinary window.
-    type: 'panel',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
-  // belt-and-suspenders: if focus leaves us (click on the game), re-assert top.
-  overlayWin.on('blur', () => { try { overlayWin.setAlwaysOnTop(true, 'screen-saver'); } catch { /* noop */ } });
+  // Clicking the game deactivates this dock-hidden (accessory) app, and macOS then
+  // orders our window out — a "hide" event we didn't ask for. Bring it straight back
+  // (showInactive doesn't steal focus from the game). Our own hides set
+  // overlayShouldShow=false first, so those are left alone.
+  overlayWin.on('hide', () => {
+    if (overlayShouldShow && overlayWin && !overlayWin.isDestroyed()) {
+      setTimeout(() => {
+        try {
+          if (overlayShouldShow && overlayWin && !overlayWin.isDestroyed()) {
+            overlayWin.showInactive();
+            overlayWin.setAlwaysOnTop(true, 'screen-saver');
+          }
+        } catch { /* noop */ }
+      }, 50);
+    }
+  });
   // skipTransformProcessType keeps a dock-hidden (accessory) app from switching
   // activation policy here — without it the overlay hides when you click elsewhere.
   overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
@@ -108,6 +124,7 @@ function createOverlay() {
 
 function setOverlayShown(show) {
   if (!overlayWin || overlayWin.isDestroyed()) return;
+  overlayShouldShow = show; // record intent BEFORE hide(), so the 'hide' handler won't fight it
   if (show && !overlayWin.isVisible()) overlayWin.showInactive();
   else if (!show && overlayWin.isVisible()) overlayWin.hide();
 }

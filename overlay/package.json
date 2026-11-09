@@ -6,7 +6,7 @@
   "main": "src/main.mjs",
   "scripts": {
     "build:renderer": "vite build",
-    "start": "vite build && electron .",
+    "start": "pkill -f 'ward/overlay/node_modules/electron' 2>/dev/null; sleep 0.3; vite build && electron .",
     "dist": "vite build && electron-builder"
   },
   "dependencies": {

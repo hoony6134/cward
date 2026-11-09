@@ -90,6 +90,9 @@ function createOverlay() {
     transparent: true, frame: false, hasShadow: false,
     resizable: false, movable: false, skipTaskbar: true,
     focusable: false, show: false, fullscreenable: false, enableLargerThanScreen: true,
+    // Non-activating panel: clicking/dragging the overlay does NOT activate our app,
+    // so the game keeps focus (otherwise borderless LoL drops to the desktop).
+    type: 'panel',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');

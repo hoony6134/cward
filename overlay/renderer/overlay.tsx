@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, loadItemHaste, loadRunes,
   champIcon, champIconById, champ, spellIcon, fmtClock, spellCd, loadUltCd, ultRank, itemHaste, withHaste,
-  itemIcon, perkIcon, sumSpellIcon,
+  itemIcon, perkIcon, sumSpellIcon, loadAbilityIcons,
 } from '@web/ddragon';
 import type { Snapshot, Player } from '@web/useRelay';
 
@@ -117,28 +117,49 @@ function maxOrder(order: string[]): string[] {
   return ['Q', 'W', 'E'].sort((a, b) => c[b][0] - c[a][0] || c[a][1] - c[b][1]);
 }
 
-function BuildDock({ build, ready, abilities }: { build: NonNullable<Build>; ready: boolean; abilities?: { Q: number; W: number; E: number; R: number } | null }) {
+// The player's Q/W/E/R ability icons with the next-to-level one highlighted (pink).
+// Drag it next to the game's own skill bar.
+function AbilityBar({ champKey, abilities, skills, ready }: { champKey: string; abilities?: { Q: number; W: number; E: number; R: number } | null; skills: string[]; ready: boolean }) {
+  const [icons, setIcons] = useState<{ Q: string; W: string; E: string; R: string } | null>(null);
+  useEffect(() => { if (champKey) loadAbilityIcons(champKey).then(setIcons); }, [champKey]);
+  const drag = useDraggable('ability', { left: Math.round(window.innerWidth / 2 - 96), top: window.innerHeight - 150 });
+  const spent = abilities ? abilities.Q + abilities.W + abilities.E + abilities.R : 0;
+  const next = skills[spent]; // which ability to level with the next point
+  const keys = ['Q', 'W', 'E', 'R'] as const;
+  return (
+    <div className="card ability-bar" style={drag.style} {...capture}>
+      <div className="title" {...drag.handle}>다음 선마 ⠿</div>
+      <div className="row" style={{ gap: 6 }}>
+        {keys.map((k) => (
+          <div className={`abil${next === k ? ' next' : ''}`} key={k}>
+            {ready && icons?.[k] ? <img src={icons[k]} alt={k} /> : <span className="abil-l">{k}</span>}
+            <span className="abil-k">{k}{abilities ? abilities[k] : 0}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Recommended build. In-game: items only (what to buy). Champ select (full): also
+// skill order, runes and summoner spells — the things you set at the pick screen.
+function BuildDock({ build, ready, full }: { build: NonNullable<Build>; ready: boolean; full?: boolean }) {
   const wr = build.winRate != null ? ` · 승률 ${Math.round(build.winRate * 100)}%` : '';
   const items = [...(build.items?.ids ?? []), ...build.boots];
   const drag = useDraggable('build', { left: Math.max(0, window.innerWidth - 314), top: Math.max(0, window.innerHeight - 230) });
-  // Points already spent = sum of current ability ranks → next skill is order[spent].
-  const spent = abilities ? abilities.Q + abilities.W + abilities.E + abilities.R : 0;
   return (
     <div className="card build-dock" style={drag.style} {...capture}>
-      <div className="title" {...drag.handle}>추천 빌드 · OP.GG ({build.mode}){wr} ⠿</div>
-      {items.length ? <div className="wrap" style={{ marginBottom: 8 }}>{ready && items.map((id, i) => <img key={i} className="itm" src={itemIcon(id)} />)}</div> : null}
-      {build.skills.length ? (
-        <div style={{ marginBottom: 6 }}>
-          <span className="muted" style={{ fontSize: 10 }}>선마 {maxOrder(build.skills).join('›')} · 다음 </span>
-          <span className="sk-strip">
-            {build.skills.map((k, i) => <b key={i} className={`sk ${i < spent ? 'done' : i === spent ? 'next' : ''}`}>{k}</b>)}
-          </span>
+      <div className="title" {...drag.handle}>추천 {full ? '빌드' : '아이템'} · OP.GG ({build.mode}){wr} ⠿</div>
+      {items.length ? <div className="wrap">{ready && items.map((id, i) => <img key={i} className="itm" src={itemIcon(id)} />)}</div> : null}
+      {full && build.skills.length ? (
+        <div style={{ marginTop: 8 }}><span className="muted" style={{ fontSize: 10 }}>선마 </span><b style={{ color: '#e9c877', fontSize: 12 }}>{maxOrder(build.skills).join(' › ')}</b></div>
+      ) : null}
+      {full && (build.runes || build.spells.length) ? (
+        <div className="row" style={{ gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+          {build.runes && ready ? <span className="wrap">{[...build.runes.primary.slice(0, 1), ...build.runes.secondary.slice(0, 1)].map((id, i) => <img key={i} className="rune" src={perkIcon(id)} />)}</span> : null}
+          {build.spells.length && ready ? <span className="wrap">{build.spells.map((id, i) => { const s = sumSpellIcon(id); return s ? <img key={i} className="sp" src={s} /> : null; })}</span> : null}
         </div>
       ) : null}
-      <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-        {build.runes && ready ? <span className="wrap">{[...build.runes.primary.slice(0, 1), ...build.runes.secondary.slice(0, 1)].map((id, i) => <img key={i} className="rune" src={perkIcon(id)} />)}</span> : null}
-        {build.spells.length && ready ? <span className="wrap">{build.spells.map((id, i) => { const s = sumSpellIcon(id); return s ? <img key={i} className="sp" src={s} /> : null; })}</span> : null}
-      </div>
     </div>
   );
 }
@@ -178,11 +199,15 @@ function App() {
   const players = snap!.players ?? [];
   const me = players.find((p) => p.riotId === snap!.active?.riotId);
   const enemies = me ? players.filter((p) => p.team !== me.team) : players.filter((p) => p.team === 'CHAOS');
+  if (snap!.kind === 'champselect') {
+    return <><ChampSelectHead snap={snap!} ready={ready} />{build && <BuildDock build={build} ready={ready} full />}</>;
+  }
   return (
     <>
-      {snap!.kind === 'ingame' && <TopHud snap={snap!} />}
-      {snap!.kind === 'ingame' && <SpellTracker enemies={enemies} ready={ready} />}
-      {build && <BuildDock build={build} ready={ready} abilities={snap!.active?.abilities} />}
+      <TopHud snap={snap!} />
+      <SpellTracker enemies={enemies} ready={ready} />
+      {me?.champKey && build?.skills?.length ? <AbilityBar champKey={me.champKey} abilities={snap!.active?.abilities} skills={build.skills} ready={ready} /> : null}
+      {build && <BuildDock build={build} ready={ready} />}
     </>
   );
 }

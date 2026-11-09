@@ -89,6 +89,20 @@ export async function loadUltCd(champKey: string): Promise<number[]> {
 // R rank from champion level: 6-10 -> 1, 11-15 -> 2, 16+ -> 3.
 export const ultRank = (level: number) => (level >= 16 ? 3 : level >= 11 ? 2 : 1);
 
+// Q/W/E/R ability icon URLs for a champion, cached by key.
+const abilityIconCache: Record<string, { Q: string; W: string; E: string; R: string }> = {};
+export async function loadAbilityIcons(champKey: string): Promise<{ Q: string; W: string; E: string; R: string }> {
+  if (abilityIconCache[champKey]) return abilityIconCache[champKey];
+  const empty = { Q: '', W: '', E: '', R: '' };
+  try {
+    const r = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion/${champKey}.json`);
+    const d = (await r.json()) as { data: Record<string, { spells: { image: { full: string } }[] }> };
+    const sp = Object.values(d.data)[0]?.spells ?? [];
+    const url = (f?: string) => (f ? `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${f}` : '');
+    return (abilityIconCache[champKey] = { Q: url(sp[0]?.image.full), W: url(sp[1]?.image.full), E: url(sp[2]?.image.full), R: url(sp[3]?.image.full) });
+  } catch { return (abilityIconCache[champKey] = empty); }
+}
+
 // Rune data (CommunityDragon): perk id -> {name, icon}, and the tree structure for the editor.
 const CD = 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default';
 const cdragon = (p?: string) => (p ? `${CD}${p.toLowerCase().replace('/lol-game-data/assets', '')}` : '');

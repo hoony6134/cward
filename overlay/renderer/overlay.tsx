@@ -128,7 +128,7 @@ function AbilityBar({ champKey, abilities, skills, ready }: { champKey: string; 
   const keys = ['Q', 'W', 'E', 'R'] as const;
   return (
     <div className="card ability-bar" style={drag.style} {...capture}>
-      <div className="title" {...drag.handle}>다음 선마 ⠿</div>
+      <div className="title" {...drag.handle}>스킬 추천 ⠿</div>
       <div className="row" style={{ gap: 6 }}>
         {keys.map((k) => (
           <div className={`abil${next === k ? ' next' : ''}`} key={k}>

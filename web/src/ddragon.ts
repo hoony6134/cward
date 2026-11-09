@@ -48,6 +48,7 @@ export const allChampions = () =>
 
 // Summoner spells: icon-by-id map + a filterable list (used by the slot spell picker).
 let spellImgById: Record<number, string> = {};
+let spellImgByName: Record<string, string> = {};
 let spellList: { id: number; name: string; modes: string[] }[] = [];
 export async function loadSummonerSpells(): Promise<void> {
   try {
@@ -55,9 +56,14 @@ export async function loadSummonerSpells(): Promise<void> {
     const d = (await r.json()) as { data: Record<string, { key: string; name: string; image: { full: string }; modes: string[] }> };
     const all = Object.values(d.data);
     spellImgById = Object.fromEntries(all.map((s) => [Number(s.key), s.image.full]));
+    spellImgByName = Object.fromEntries(all.map((s) => [s.name, s.image.full]));
     spellList = all.map((s) => ({ id: Number(s.key), name: s.name, modes: s.modes || [] }));
   } catch { /* keep empty */ }
 }
+// Icon by the in-game Korean display name (e.g. "점멸", "순간이동") — more robust than
+// guessing a filename from the raw key, which breaks for special/variant spells.
+export const spellIconByName = (name: string) =>
+  spellImgByName[name] ? `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${spellImgByName[name]}` : '';
 export const summonerSpells = (mode = 'CLASSIC') =>
   spellList.filter((s) => s.modes.includes(mode)).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 export const sumSpellIcon = (id: number) =>

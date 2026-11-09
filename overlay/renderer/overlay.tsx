@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, loadItemHaste, loadRunes,
-  champIcon, champIconById, champ, spellIcon, fmtClock, spellCd, loadUltCd, ultRank, itemHaste, withHaste,
+  champIcon, champIconById, champ, spellIcon, spellIconByName, fmtClock, spellCd, loadUltCd, ultRank, itemHaste, withHaste,
   itemIcon, perkIcon, sumSpellIcon, loadAbilityIcons,
 } from '@web/ddragon';
 import type { Snapshot, Player } from '@web/useRelay';
@@ -91,9 +91,9 @@ function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean })
           <div className="row" key={p.riotId}>
             {ready && <img className="champ" src={champIcon(p.champKey)} alt={p.champion} />}
             <div className="wrap">
-              {p.spells.map((s, i) => s?.key ? (
-                <Chip key={i} icon={ready ? spellIcon(s.key) : ''} left={left(`${p.riotId}:s${i}`)}
-                  title={s.name || s.key} onClick={() => toggle(`${p.riotId}:s${i}`, spellCd(s.key))} />
+              {p.spells.map((s, i) => (s?.key || s?.name) ? (
+                <Chip key={i} icon={ready ? (spellIconByName(s.name) || spellIcon(s.key)) : ''} left={left(`${p.riotId}:s${i}`)}
+                  label={(s.name || s.key || '').slice(0, 2)} title={s.name || s.key} onClick={() => toggle(`${p.riotId}:s${i}`, spellCd(s.key))} />
               ) : null)}
               <Chip label="R" left={left(`${p.riotId}:R`)} title={`궁 ${rCd(p)}초`} onClick={() => toggle(`${p.riotId}:R`, rCd(p))} />
             </div>
@@ -105,9 +105,12 @@ function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean })
 }
 
 function Chip({ icon, label, left, title, onClick }: { icon?: string; label?: string; left: number; title: string; onClick: () => void }) {
+  const [err, setErr] = useState(false);
+  const showImg = icon && !err;
   return (
     <button className={`chip${left ? ' cooling' : ''}`} title={title} onClick={onClick}>
-      {icon ? <img src={icon} alt={title} /> : <span className="cd" style={{ color: left ? '#8aa0b8' : '#9ec1ff' }}>{label}</span>}
+      {showImg ? <img src={icon} alt={title} onError={() => setErr(true)} />
+        : <span className="cd chip-l" style={{ color: left ? '#8aa0b8' : '#9ec1ff' }}>{label}</span>}
       {left > 0 && <span className="cd">{left}</span>}
     </button>
   );

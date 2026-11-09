@@ -1073,7 +1073,7 @@ function Waiting({ status, clientOff, phase }: { status: string; clientOff: bool
   );
 }
 
-const RELEASES_URL = 'https://github.com/hoony6134/ward/releases';
+const RELEASES_URL = 'https://github.com/hoony6134/cward/releases';
 const DL = {
   win: `${RELEASES_URL}/latest/download/cward-agent-windows-x64.exe`,
   macArm: `${RELEASES_URL}/latest/download/cward-agent-macos-arm64`,

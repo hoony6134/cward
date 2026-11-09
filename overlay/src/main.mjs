@@ -95,30 +95,11 @@ function createOverlay() {
     transparent: true, frame: false, hasShadow: false,
     resizable: false, movable: false, skipTaskbar: true,
     focusable: false, show: false, fullscreenable: false, enableLargerThanScreen: true,
-    // Non-activating panel: clicking/dragging the overlay does NOT activate our app,
-    // so the game keeps focus (otherwise borderless LoL drops to the desktop).
-    type: 'panel',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
+  // Regular always-on-top window (NOT a panel): a normal window stays visible when
+  // the app is deactivated (clicking the game), so there's no hide/re-show churn.
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
-  // Clicking the game deactivates this dock-hidden (accessory) app, and macOS then
-  // orders our window out — a "hide" event we didn't ask for. Bring it straight back
-  // (showInactive doesn't steal focus from the game). Our own hides set
-  // overlayShouldShow=false first, so those are left alone.
-  // If macOS still orders the window out when we're deactivated, bring it right
-  // back with no visible delay (showInactive doesn't steal focus from the game).
-  overlayWin.on('hide', () => {
-    if (overlayShouldShow && overlayWin && !overlayWin.isDestroyed()) {
-      setImmediate(() => {
-        try {
-          if (overlayShouldShow && overlayWin && !overlayWin.isDestroyed()) {
-            overlayWin.showInactive();
-            overlayWin.setAlwaysOnTop(true, 'screen-saver');
-          }
-        } catch { /* noop */ }
-      });
-    }
-  });
   overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWin.setIgnoreMouseEvents(true, { forward: true }); // click-through; panels toggle capture on hover
   overlayWin.webContents.on('did-finish-load', () => console.log('[overlay] loaded'));

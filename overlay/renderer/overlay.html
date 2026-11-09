@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>cward overlay</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+      color: #e6edf6; user-select: none; -webkit-user-select: none;
+    }
+    #root { height: 100%; padding: 8px; }
+    .card {
+      background: rgba(10, 17, 28, 0.82); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+      border: 1px solid rgba(90, 120, 160, 0.25); border-radius: 12px; padding: 8px 10px; margin-bottom: 8px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    }
+    .drag { -webkit-app-region: drag; }
+    .nodrag { -webkit-app-region: no-drag; }
+    .title { font-size: 10.5px; letter-spacing: .04em; color: #8aa0b8; text-transform: uppercase; margin-bottom: 6px; }
+    .clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 18px; color: #e9c877; }
+    .row { display: flex; align-items: center; gap: 6px; }
+    .muted { color: #8aa0b8; }
+    .chip {
+      position: relative; width: 26px; height: 26px; border-radius: 6px; overflow: hidden;
+      border: 1px solid rgba(120,150,190,.3); background: #122235; cursor: pointer;
+    }
+    .chip img { width: 100%; height: 100%; display: block; }
+    .chip.cooling img { filter: grayscale(1) brightness(.45); }
+    .chip .cd { position: absolute; inset: 0; display: grid; place-items: center; font: 700 11px ui-monospace, monospace; color: #fff; }
+    .champ { width: 28px; height: 28px; border-radius: 6px; border: 1px solid rgba(120,150,190,.3); }
+    .name { font-size: 11px; width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pill { font-size: 11px; }
+    .pill b { color: #e9c877; font-weight: 600; }
+    .idle { font-size: 11px; color: #8aa0b8; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/overlay.tsx"></script>
+</body>
+</html>

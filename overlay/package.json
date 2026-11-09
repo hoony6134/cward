@@ -1,0 +1,36 @@
+{
+  "name": "cward-overlay",
+  "private": true,
+  "type": "module",
+  "description": "cward macOS menu-bar app: phone pairing (no terminal) + in-game overlay",
+  "main": "src/main.mjs",
+  "scripts": {
+    "build:renderer": "vite build",
+    "start": "vite build && electron .",
+    "dist": "vite build && electron-builder"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.3.5"
+  },
+  "build": {
+    "appId": "xyz.scian.cward",
+    "productName": "cward",
+    "files": ["src/**", "renderer/**", "renderer-dist/**", "../agent/src/**", "../shared/**"],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": ["dmg"]
+    }
+  }
+}

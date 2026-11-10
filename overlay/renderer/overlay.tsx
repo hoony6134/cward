@@ -22,6 +22,7 @@ declare global {
       onPairing: (cb: (d: { link: string; qr: string }) => void) => void;
       onEditMode: (cb: (on: boolean) => void) => void;
       getAugments: () => Promise<Augment[] | null>;
+      setClickable: (on: boolean) => void;
       ready: () => void;
     };
   }
@@ -250,6 +251,17 @@ function App() {
     }
   }, []);
   useEffect(() => { document.body.classList.toggle('editing', editing); }, [editing]);
+  // Catch the mouse only while hovering a clickable panel, so cooldowns/buttons
+  // are clickable in-game without edit mode (overlay is click-through otherwise).
+  useEffect(() => {
+    const api = window.cward; if (!api?.setClickable) return;
+    const hit = (t: EventTarget | null) => (t as Element)?.closest?.('.card, .hl-grip');
+    const over = (e: PointerEvent) => { if (!editing && hit(e.target)) api.setClickable(true); };
+    const out = (e: PointerEvent) => { if (!editing && hit(e.target) && !hit(e.relatedTarget)) api.setClickable(false); };
+    document.addEventListener('pointerover', over);
+    document.addEventListener('pointerout', out);
+    return () => { document.removeEventListener('pointerover', over); document.removeEventListener('pointerout', out); };
+  }, [editing]);
 
   const editBanner = editing ? <div className="edit-banner">편집 모드 · 패널을 드래그해 배치 · ⌘⇧E로 잠금</div> : null;
   const inGame = snap && (snap.kind === 'ingame' || snap.kind === 'champselect') && (snap.players?.length || snap.kind === 'champselect');

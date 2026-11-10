@@ -10,4 +10,8 @@ contextBridge.exposeInMainWorld('cward', {
   onReco: (cb) => ipcRenderer.on('reco', (_e, r) => cb(r)),
   onEditMode: (cb) => ipcRenderer.on('editmode', (_e, on) => cb(on)),
   getAugments: () => ipcRenderer.invoke('augments:get'),
+  // While playing the overlay is click-through; the renderer flips this on only
+  // while the pointer is over a clickable panel, so you can click cooldowns etc.
+  // without edit mode. No show/hide here (that caused focus churn before).
+  setClickable: (on) => ipcRenderer.send('overlay:clickable', !!on),
 });

@@ -149,6 +149,15 @@ function setEditMode(on) {
   console.log('[overlay] editmode', on, 'visible=', overlayWin.isVisible());
 }
 
+// Hover-to-click: renderer asks to catch the mouse while the pointer is over a
+// clickable panel, then releases it on leave. Pure mouse-event toggling (no
+// show/hide) so it can't cause focus churn. Ignored in edit mode (whole window
+// already catches the mouse there).
+ipcMain.on('overlay:clickable', (_e, on) => {
+  if (!overlayWin || overlayWin.isDestroyed() || editMode) return;
+  overlayWin.setIgnoreMouseEvents(!on, { forward: true });
+});
+
 // ARAM: Mayhem augment reference (name/tier/description) for the overlay.
 ipcMain.handle('augments:get', () => getAugments());
 

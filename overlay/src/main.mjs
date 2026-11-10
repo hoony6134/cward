@@ -229,7 +229,12 @@ function registerShortcuts() {
 }
 
 function trayIcon() {
-  // TODO(polish): ship a real template icon. Empty image + title for now.
+  // Control-ward silhouette as a menu-bar template image (adapts to light/dark).
+  // Loads @2x/@3x variants automatically from the same basename.
+  try {
+    const img = nativeImage.createFromPath(path.join(__dirname, '../assets/iconTemplate.png'));
+    if (!img.isEmpty()) { img.setTemplateImage(true); return img; }
+  } catch { /* fall through to text title */ }
   return nativeImage.createEmpty();
 }
 

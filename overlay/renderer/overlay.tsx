@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   loadDDragonVersion, loadChampions, loadSummonerSpells, loadItemHaste, loadRunes,
@@ -23,10 +23,15 @@ declare global {
       onEditMode: (cb: (on: boolean) => void) => void;
       getAugments: () => Promise<Augment[] | null>;
       setClickable: (on: boolean) => void;
+      sendTeamCd?: (m: { k: string; endAt: number }) => void;
+      getTeam?: () => Promise<{ cds: Record<string, number>; n: number }>;
+      onTeam?: (cb: (m: TeamMsg) => void) => () => void;
       ready: () => void;
     };
   }
 }
+
+type TeamMsg = { type: 'cd'; k: string; endAt: number } | { type: 'state'; cds: Record<string, number> } | { type: 'peers'; n: number };
 
 type Augment = { id: string; name: string; tier: string; desc: string; icon: string; champs: string[] };
 
@@ -66,22 +71,41 @@ function useNow() {
   return Date.now();
 }
 
-function SpellTracker({ enemies, ready }: { enemies: Player[]; ready: boolean }) {
+// Enemy spell/ult timers. Shared with teammates running cward in the same game:
+// end times travel in GAME seconds (machines' clocks differ, the game clock doesn't).
+function SpellTracker({ enemies, ready, gameNow }: { enemies: Player[]; ready: boolean; gameNow: () => number }) {
   const now = useNow();
   const [until, setUntil] = useState<Record<string, number>>({});
   const [ultCd, setUltCd] = useState<Record<string, number[]>>({});
+  const [peers, setPeers] = useState(0);
+  const drag = useDraggable('spell', { left: 10, top: Math.round(window.innerHeight * 0.5 - 130) });
   useEffect(() => {
     enemies.forEach((p) => { if (p.champKey && !ultCd[p.champKey]) loadUltCd(p.champKey).then((cd) => setUltCd((m) => ({ ...m, [p.champKey]: cd }))); });
   }, [enemies, ultCd]);
+  useEffect(() => {
+    const api = window.cward; if (!api?.onTeam) return;
+    // game-second end time -> local wall-clock deadline (0 / past = ready)
+    const toLocal = (endAt: number) => { const ms = (endAt - gameNow()) * 1000; return endAt > 0 && ms > 0 ? Date.now() + ms : 0; };
+    const applyAll = (cds: Record<string, number>) => setUntil((u) => { const n = { ...u }; for (const [k, e] of Object.entries(cds)) n[k] = toLocal(e); return n; });
+    api.getTeam?.().then((t) => { if (t) { applyAll(t.cds); setPeers(t.n); } });
+    return api.onTeam((m) => {
+      if (m.type === 'cd') setUntil((u) => ({ ...u, [m.k]: toLocal(m.endAt) }));
+      else if (m.type === 'state') applyAll(m.cds);
+      else if (m.type === 'peers') setPeers(m.n);
+    });
+  }, [gameNow]);
   if (!enemies.length) return null;
-  const toggle = (k: string, cd: number) => setUntil((u) => ({ ...u, [k]: u[k] && u[k] > now ? 0 : now + cd * 1000 }));
+  const toggle = (k: string, cd: number) => {
+    const clearing = (until[k] || 0) > now;
+    setUntil((u) => ({ ...u, [k]: clearing ? 0 : now + cd * 1000 }));
+    window.cward?.sendTeamCd?.({ k, endAt: clearing ? 0 : gameNow() + cd });
+  };
   const left = (k: string) => Math.max(0, Math.ceil(((until[k] || 0) - now) / 1000));
   const ah = (p: Player) => p.items.reduce((s, it) => s + itemHaste(it.id), 0);
   const rCd = (p: Player) => withHaste(ultCd[p.champKey]?.[ultRank(p.level) - 1] ?? 100, ah(p));
-  const drag = useDraggable('spell', { left: 10, top: Math.round(window.innerHeight * 0.5 - 130) });
   return (
     <div className="card left-rail" style={drag.style} >
-      <div className="title" {...drag.handle}>상대 스펠 · 궁 쿨 ⠿</div>
+      <div className="title" {...drag.handle}>상대 스펠 · 궁 쿨{peers > 1 ? ` · 팀 동기화 ${peers}명` : ''} ⠿</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {enemies.map((p) => (
           <div className="row" key={p.riotId}>
@@ -226,12 +250,38 @@ function AugmentPanel() {
   );
 }
 
+// Champ-select header (my pick + pick timer). It was deleted in an earlier layout
+// change while still being rendered, so champ select threw and — with no error
+// boundary — blanked the whole overlay for the rest of the session.
+function ChampSelectHead({ snap, ready }: { snap: Snapshot; ready: boolean }) {
+  const id = snap.mine?.championId;
+  const c = id ? champ(id) : null;
+  return (
+    <div className="card" style={{ position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)' }}>
+      <div className="row">
+        {ready && id ? <img className="champ" src={champIconById(id)} alt={c?.name} /> : <span className="champ" style={{ background: '#122235' }} />}
+        <span style={{ fontSize: 13, fontWeight: 700 }}>{c?.name ?? '챔피언 선택'}</span>
+        <span className="muted" style={{ fontSize: 11, marginLeft: 8 }}>{snap.timeLeft ? `${snap.timeLeft}s` : '챔프 선택'}</span>
+      </div>
+    </div>
+  );
+}
+
+// A render error must never blank the overlay for good: drop to nothing and
+// retry shortly (e.g. a champ-select-only bug recovers once the game starts).
+class Boundary extends Component<{ children: ReactNode }, { err: boolean }> {
+  state = { err: false };
+  static getDerivedStateFromError() { return { err: true }; }
+  componentDidCatch(e: unknown) { console.error('[overlay] render error', e); setTimeout(() => this.setState({ err: false }), 2000); }
+  render() { return this.state.err ? null : this.props.children; }
+}
+
 function TopHud({ snap }: { snap: Snapshot }) {
   const o = snap.objectives;
   const drag = useDraggable('hud', { left: Math.round(window.innerWidth / 2 - 120), top: 12 });
   return (
     <div className="card top-hud" style={drag.style} >
-      <div className="row" style={{ gap: 10 }} {...drag.handle}>
+      <div className="row" {...drag.handle} style={{ ...drag.handle.style, gap: 10 }}>
         <span className="clock">{fmtClock(snap.game?.time ?? 0)}</span>
         <span className="muted" style={{ fontSize: 11 }}>{snap.game?.mode ?? ''}</span>
         {snap.active && <span className="pill"><b>{snap.active.gold.toLocaleString('ko-KR')}</b> G</span>}
@@ -246,11 +296,14 @@ function App() {
   const [build, setBuild] = useState<Build>(demoBuild());
   const [ready, setReady] = useState(false);
   const [editing, setEditing] = useState(false);
+  // game clock at the last snapshot + when it arrived -> current game time
+  const clock = useRef({ time: 0, at: Date.now() });
+  const gameNow = useCallback(() => clock.current.time + (Date.now() - clock.current.at) / 1000, []);
   useEffect(() => {
     (async () => { await loadDDragonVersion(); await Promise.all([loadChampions(), loadSummonerSpells(), loadItemHaste(), loadRunes()]); setReady(true); })();
     if (window.cward) {
       setSnap(null); setBuild(null); // live mode: wait for real data
-      window.cward.onSnapshot((s) => setSnap(s));
+      window.cward.onSnapshot((s) => { if (s.game?.time != null) clock.current = { time: s.game.time, at: Date.now() }; setSnap(s); });
       window.cward.onReco((b) => setBuild(b));
       window.cward.onEditMode?.((on) => setEditing(on));
       window.cward.ready();
@@ -283,7 +336,7 @@ function App() {
     <>
       {editBanner}
       <TopHud snap={snap!} />
-      <SpellTracker enemies={enemies} ready={ready} />
+      <SpellTracker enemies={enemies} ready={ready} gameNow={gameNow} />
       {build?.skills?.length ? <SkillHighlight abilities={snap!.active?.abilities} skills={build.skills} /> : null}
       {build && <BuildDock build={build} ready={ready} owned={new Set((me?.items ?? []).map((it) => it.id))} />}
       {snap!.game?.mode === 'KIWI' && <AugmentPanel />}
@@ -321,4 +374,4 @@ function demoBuild(): Build {
   };
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(<Boundary><App /></Boundary>);

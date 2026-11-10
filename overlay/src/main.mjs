@@ -10,6 +10,8 @@ import { loadConfig, pairingLink } from './config.mjs';
 import { startAgent } from '../../agent/src/agent.mjs';
 import { getBuild } from './reco/opgg.mjs';
 import { getAugments } from './reco/augments.mjs';
+import { teamRoomOf } from './team.mjs';
+import { createRelay } from '../../agent/src/relay.mjs';
 import electronUpdater from 'electron-updater';
 const { autoUpdater } = electronUpdater;
 
@@ -53,10 +55,11 @@ app.whenReady().then(async () => {
       const inProgress = s.kind === 'menu' && s.phase === 'InProgress';
       const active = s.kind === 'ingame' || s.kind === 'champselect' || inProgress;
       if (active) { activeMiss = 0; setOverlayShown(true); }
-      else if (++activeMiss >= 6) setOverlayShown(false); // ~12s sustained idle before hiding
+      else if (++activeMiss >= 6) { setOverlayShown(false); leaveTeam(); } // ~12s sustained idle
       // Entering a game (lobby/loading → in-game) re-raises the overlay once, so a
       // game window opened after the overlay can't end up covering it.
       if (s.kind === 'ingame' && lastKind !== 'ingame') forceShow();
+      if (s.kind === 'ingame') joinTeam(s);
       lastKind = s.kind;
       if (s.kind === 'ingame' || s.kind === 'champselect') updateReco(s);
     },
@@ -138,6 +141,8 @@ function createOverlay() {
     if (overlayShouldShow && !editMode && overlayWin && !overlayWin.isDestroyed()) overlayWin.showInactive();
   });
   overlayWin.webContents.on('did-finish-load', () => console.log('[overlay] loaded'));
+  // Surface renderer errors in the app log (a silent render crash blanked the overlay).
+  overlayWin.webContents.on('console-message', (_e, level, msg) => { if (level >= 2) console.log('[renderer]', msg); });
   overlayWin.webContents.on('did-fail-load', (_e, code, desc) => console.log('[overlay] load failed', code, desc));
   overlayWin.loadFile(path.join(__dirname, '../renderer-dist/overlay.html'));
   overlayWin.on('closed', () => { overlayWin = null; });
@@ -192,6 +197,37 @@ ipcMain.on('overlay:clickable', (_e, on) => {
   if (!overlayWin || overlayWin.isDestroyed() || editMode) return;
   overlayWin.setIgnoreMouseEvents(!on, { forward: true });
 });
+
+// ---- Team cooldown sync: same game + same team share enemy spell/ult timers ----
+let team = null;                       // { room, relay }
+let teamState = { cds: {}, n: 0 };     // merged room state, replayed to a fresh renderer
+function joinTeam(snap) {
+  const t = teamRoomOf(snap);
+  if (!t || team?.room === t.room || !cfg?.relay) return;
+  leaveTeam();
+  teamState = { cds: {}, n: 0 };
+  const relay = createRelay({
+    url: cfg.relay, room: t.room, token: t.token, role: 'peer',
+    onCommand: (m) => {
+      if (m?.type === 'state' && m.cds) Object.assign(teamState.cds, m.cds);
+      else if (m?.type === 'cd' && typeof m.k === 'string') teamState.cds[m.k] = m.endAt;
+      else if (m?.type === 'peers') teamState.n = m.n;
+      else return;
+      overlayWin?.webContents.send('team', m);
+    },
+  });
+  team = { room: t.room, relay };
+}
+function leaveTeam() {
+  try { team?.relay.close(); } catch { /* noop */ }
+  team = null;
+}
+ipcMain.on('team:cd', (_e, m) => {
+  if (typeof m?.k !== 'string' || typeof m?.endAt !== 'number') return;
+  teamState.cds[m.k] = m.endAt;
+  team?.relay.send({ type: 'cd', k: m.k, endAt: m.endAt });
+});
+ipcMain.handle('team:get', () => teamState);
 
 // ARAM: Mayhem augment reference (name/tier/description) for the overlay.
 ipcMain.handle('augments:get', () => getAugments());

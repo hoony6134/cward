@@ -14,4 +14,8 @@ contextBridge.exposeInMainWorld('cward', {
   // while the pointer is over a clickable panel, so you can click cooldowns etc.
   // without edit mode. No show/hide here (that caused focus churn before).
   setClickable: (on) => ipcRenderer.send('overlay:clickable', !!on),
+  // Team cooldown sync (same game, same team).
+  sendTeamCd: (m) => ipcRenderer.send('team:cd', m),
+  getTeam: () => ipcRenderer.invoke('team:get'),
+  onTeam: (cb) => { const h = (_e, m) => cb(m); ipcRenderer.on('team', h); return () => ipcRenderer.removeListener('team', h); },
 });

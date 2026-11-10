@@ -10,6 +10,8 @@ import { loadConfig, pairingLink } from './config.mjs';
 import { startAgent } from '../../agent/src/agent.mjs';
 import { getBuild } from './reco/opgg.mjs';
 import { getAugments } from './reco/augments.mjs';
+import electronUpdater from 'electron-updater';
+const { autoUpdater } = electronUpdater;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -61,6 +63,13 @@ app.whenReady().then(async () => {
   registerShortcuts();
   if (process.env.CWARD_SHOW_OVERLAY) setOverlayShown(true); // manual smoke test
   if (cfg.created) showPairing(); // first run: guide the user to pair the phone
+
+  // Auto-update from GitHub releases (electron-updater). Only in a packaged build;
+  // checks on launch and every 6h, downloads in the background, installs on quit.
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify().catch(() => { /* offline / no release */ });
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+  }
 });
 
 // Keep running when all windows are closed (tray app).
@@ -78,6 +87,7 @@ function buildTray() {
     { label: '오버레이 보기/숨기기  ⌘⇧O', click: () => setOverlayShown(!overlayShouldShow) },
     { label: '위치 편집 모드  ⌘⇧E', click: () => setEditMode(!editMode) },
     { type: 'separator' },
+    { label: '업데이트 확인', click: () => { if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify().catch(() => {}); } },
     { label: '종료', click: () => app.quit() },
   ]);
   tray.setContextMenu(menu);

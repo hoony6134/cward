@@ -24,6 +24,7 @@ let latestSnap = null;
 let agent = null;
 let activeMiss = 0;           // consecutive non-active snapshots (debounces auto-hide)
 let overlayShouldShow = false; // what WE want; distinguishes our hide from a system hide
+let lastKind = null;          // previous snapshot kind (detects entering a game)
 
 // Single instance only — a second launch just reveals pairing.
 if (!app.requestSingleInstanceLock()) { app.quit(); }
@@ -53,6 +54,10 @@ app.whenReady().then(async () => {
       const active = s.kind === 'ingame' || s.kind === 'champselect' || inProgress;
       if (active) { activeMiss = 0; setOverlayShown(true); }
       else if (++activeMiss >= 6) setOverlayShown(false); // ~12s sustained idle before hiding
+      // Entering a game (lobby/loading → in-game) re-raises the overlay once, so a
+      // game window opened after the overlay can't end up covering it.
+      if (s.kind === 'ingame' && lastKind !== 'ingame') forceShow();
+      lastKind = s.kind;
       if (s.kind === 'ingame' || s.kind === 'champselect') updateReco(s);
     },
     onStatus: (s) => { if (tray) tray.setToolTip(`cward — relay ${s}`); },
@@ -86,7 +91,8 @@ function buildTray() {
     { label: `cward v${app.getVersion()}`, enabled: false },
     { type: 'separator' },
     { label: '폰 연동 QR 보기', click: showPairing },
-    { label: '오버레이 보기/숨기기  ⌘⇧O', click: () => setOverlayShown(!overlayShouldShow) },
+    { label: '오버레이 강제 표시  ⌘⇧O', click: () => forceShow() },
+    { label: '오버레이 숨기기', click: () => setOverlayShown(false) },
     { label: '위치 편집 모드  ⌘⇧E', click: () => setEditMode(!editMode) },
     { type: 'separator' },
     { label: '업데이트 확인', click: () => { if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify().catch(() => {}); } },
@@ -135,6 +141,18 @@ function createOverlay() {
   overlayWin.webContents.on('did-fail-load', (_e, code, desc) => console.log('[overlay] load failed', code, desc));
   overlayWin.loadFile(path.join(__dirname, '../renderer-dist/overlay.html'));
   overlayWin.on('closed', () => { overlayWin = null; });
+}
+
+// Always ends with the overlay on screen and on top, whatever state we think it's
+// in (a plain toggle hid it when we already believed it was shown).
+function forceShow() {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  overlayShouldShow = true;
+  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  overlayWin.setBounds(d.workArea);
+  overlayWin.setAlwaysOnTop(true, 'screen-saver', 1);
+  overlayWin.showInactive();
+  overlayWin.moveTop();
 }
 
 function setOverlayShown(show) {
@@ -231,7 +249,7 @@ async function updateReco(snap) {
 
 function registerShortcuts() {
   const e = globalShortcut.register('CommandOrControl+Shift+E', () => setEditMode(!editMode));
-  const o = globalShortcut.register('CommandOrControl+Shift+O', () => setOverlayShown(!overlayShouldShow));
+  const o = globalShortcut.register('CommandOrControl+Shift+O', () => forceShow());
   console.log('[overlay] shortcuts registered E=', e, 'O=', o);
 }
 

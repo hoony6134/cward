@@ -28,11 +28,15 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 app.on('second-instance', () => showPairing());
 
 app.whenReady().then(async () => {
-  // NOTE: do NOT app.dock.hide() here. A dock-hidden (accessory) app has macOS
-  // order its windows out when it's deactivated (i.e. when you click the game),
-  // which made the overlay vanish on click. Keeping a normal activation policy
-  // keeps the always-on-top overlay visible. (A dock icon shows; we can hide it
-  // properly later via LSUIElement in the packaged build.)
+  // Run as a menu-bar accessory app (no Dock icon, never the active app). This is
+  // REQUIRED for the overlay to show: when the app launches as a normal Foreground
+  // app (what Finder / LaunchServices does), the always-on-top overlay does NOT
+  // float over the game and stays invisible — but as an accessory (UIElement) app
+  // it does. (Confirmed: a direct-exec launch runs as UIElement and the overlay
+  // shows; a Finder launch runs Foreground and it doesn't.) The regular focusable
+  // window + repaint-on-show + hide→reshow handler below keep it from vanishing on
+  // click, which was the old accessory-app problem.
+  if (process.platform === 'darwin') app.setActivationPolicy('accessory');
   cfg = loadConfig(app.getPath('userData'));
   pairData = { link: pairingLink(cfg), qr: await QRCode.toDataURL(pairingLink(cfg), { margin: 1, width: 320 }) };
 
@@ -211,6 +215,8 @@ function trayIcon() {
 }
 
 function showPairing() {
+  // Accessory apps don't auto-activate, so bring the app forward to surface the QR.
+  try { app.focus({ steal: true }); } catch { /* noop */ }
   if (pairWin && !pairWin.isDestroyed()) { pairWin.show(); pairWin.focus(); return; }
   pairWin = new BrowserWindow({
     width: 420, height: 580, resizable: false, fullscreenable: false,
@@ -218,7 +224,7 @@ function showPairing() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   pairWin.loadFile(path.join(__dirname, '../renderer/pairing.html'));
-  pairWin.once('ready-to-show', () => pairWin.show());
+  pairWin.once('ready-to-show', () => { pairWin.show(); pairWin.focus(); });
   pairWin.on('closed', () => { pairWin = null; });
 }
 

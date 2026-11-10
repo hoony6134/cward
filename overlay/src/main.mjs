@@ -83,6 +83,8 @@ function buildTray() {
   tray = new Tray(trayIcon());
   tray.setToolTip('cward');
   const menu = Menu.buildFromTemplate([
+    { label: `cward v${app.getVersion()}`, enabled: false },
+    { type: 'separator' },
     { label: '폰 연동 QR 보기', click: showPairing },
     { label: '오버레이 보기/숨기기  ⌘⇧O', click: () => setOverlayShown(!overlayShouldShow) },
     { label: '위치 편집 모드  ⌘⇧E', click: () => setEditMode(!editMode) },

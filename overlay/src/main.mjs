@@ -117,7 +117,7 @@ function createOverlay() {
     // the game's focus.
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
-  overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  overlayWin.setAlwaysOnTop(true, 'screen-saver', 1); // +1: League's game window sits at the same level (1000), so equal-level ordering let it cover us
   overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWin.setIgnoreMouseEvents(true, { forward: true }); // click-through; panels toggle capture on hover
   // If macOS orders our window out while we want it shown (it does this occasionally
@@ -143,7 +143,7 @@ function setOverlayShown(show) {
     // repaint so the overlay actually appears. (This was the "overlay never shows" bug.)
     const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     overlayWin.setBounds(d.workArea);
-    overlayWin.setAlwaysOnTop(true, 'screen-saver');
+    overlayWin.setAlwaysOnTop(true, 'screen-saver', 1); // +1: League's game window sits at the same level (1000), so equal-level ordering let it cover us
     overlayWin.showInactive();
   } else if (!show && overlayWin.isVisible()) overlayWin.hide();
 }

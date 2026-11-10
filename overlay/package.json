@@ -1,7 +1,7 @@
 {
   "name": "cward-overlay",
   "private": true,
-  "version": "1.0.6",
+  "version": "1.0.7",
   "author": "JeongHoon Lim <hoony6134@gmail.com>",
   "type": "module",
   "description": "cward macOS menu-bar app: phone pairing (no terminal) + in-game overlay",

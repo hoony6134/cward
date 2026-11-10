@@ -108,11 +108,13 @@ function createOverlay() {
     // when the app deactivates (clicking the game) → the overlay vanished on click.
     // It's click-through during play anyway, so it never actually takes focus.
     show: false, fullscreenable: false, enableLargerThanScreen: true,
-    // Regular window (NOT a panel): a panel has hidesOnDeactivate, so it only shows
-    // while OUR app is active — i.e. it vanishes whenever the game is focused. A
-    // regular window has no such behavior, so it stays visible. During play the
-    // overlay is fully click-through (edit mode off), so our app never activates and
-    // never steals the game's focus; dragging happens only in edit mode (⌘⇧E).
+    // Non-activating panel: clicking the overlay (cooldowns, augment toggle) must not
+    // activate cward, or League loses focus and macOS switches the window/Space.
+    type: 'panel',
+    // Panel history: as a panel in a normal (Dock) app it vanished whenever the game
+    // was focused (hidesOnDeactivate). Now the app is a menu-bar accessory that never
+    // becomes active, so a non-activating panel stays up and clicks on it don't steal
+    // the game's focus.
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');

@@ -33,17 +33,23 @@ type Augment = { id: string; name: string; tier: string; desc: string; icon: str
 // When a panel captures clicks, the full-screen window must briefly stop ignoring
 // the mouse while the pointer is over it; otherwise clicks fall through to the game.
 type Pos = { left: number; top: number };
+// Keep a panel's top-left on screen (a saved spot from a bigger screen or a drag
+// past the edge would otherwise leave the panel invisible off-screen).
+const clampPos = (p: Pos): Pos => ({
+  left: Math.min(Math.max(0, p.left), Math.max(0, window.innerWidth - 60)),
+  top: Math.min(Math.max(0, p.top), Math.max(0, window.innerHeight - 40)),
+});
 // Drag a panel by its title bar; position persists in localStorage. Double-click
 // the title to reset to the default spot.
 function useDraggable(key: string, def: Pos) {
   const [pos, setPos] = useState<Pos>(() => {
-    try { const s = localStorage.getItem('cward:pos:' + key); if (s) return JSON.parse(s); } catch { /* ignore */ }
-    return def;
+    try { const s = localStorage.getItem('cward:pos:' + key); if (s) return clampPos(JSON.parse(s)); } catch { /* ignore */ }
+    return clampPos(def);
   });
   const onPointerDown = (e: { clientX: number; clientY: number; preventDefault: () => void }) => {
     e.preventDefault();
     const sx = e.clientX, sy = e.clientY, base = pos;
-    const move = (ev: PointerEvent) => setPos({ left: Math.max(0, base.left + ev.clientX - sx), top: Math.max(0, base.top + ev.clientY - sy) });
+    const move = (ev: PointerEvent) => setPos(clampPos({ left: base.left + ev.clientX - sx, top: base.top + ev.clientY - sy }));
     const up = () => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
       setPos((p) => { try { localStorage.setItem('cward:pos:' + key, JSON.stringify(p)); } catch { /* ignore */ } return p; });

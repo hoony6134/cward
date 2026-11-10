@@ -71,6 +71,7 @@ function buildTray() {
   tray.setToolTip('cward');
   const menu = Menu.buildFromTemplate([
     { label: '폰 연동 QR 보기', click: showPairing },
+    { label: '오버레이 보기/숨기기  ⌘⇧O', click: () => setOverlayShown(!overlayShouldShow) },
     { label: '위치 편집 모드  ⌘⇧E', click: () => setEditMode(!editMode) },
     { type: 'separator' },
     { label: '종료', click: () => app.quit() },
@@ -87,7 +88,7 @@ function createOverlay() {
   // capture on hover (ipc 'overlay:mouse-ignore').
   overlayWin = new BrowserWindow({
     x: workArea.x, y: workArea.y, width: workArea.width, height: workArea.height,
-    transparent: true, frame: false, hasShadow: false,
+    transparent: true, frame: false, hasShadow: false, backgroundColor: '#00000000',
     resizable: false, movable: false, skipTaskbar: true,
     // NOTE: focusable stays true. A focusable:false window is ordered out by macOS
     // when the app deactivates (clicking the game) → the overlay vanished on click.
@@ -119,8 +120,16 @@ function createOverlay() {
 function setOverlayShown(show) {
   if (!overlayWin || overlayWin.isDestroyed()) return;
   overlayShouldShow = show; // record intent BEFORE hide(), so the 'hide' handler won't fight it
-  if (show && !overlayWin.isVisible()) overlayWin.showInactive();
-  else if (!show && overlayWin.isVisible()) overlayWin.hide();
+  if (show && !overlayWin.isVisible()) {
+    // Place on the display the game is on (cursor sits there in-game) and show. The
+    // setBounds is also load-bearing: a transparent frameless window otherwise reports
+    // visible=true but never paints on some macOS versions — resizing on show forces the
+    // repaint so the overlay actually appears. (This was the "overlay never shows" bug.)
+    const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+    overlayWin.setBounds(d.workArea);
+    overlayWin.setAlwaysOnTop(true, 'screen-saver');
+    overlayWin.showInactive();
+  } else if (!show && overlayWin.isVisible()) overlayWin.hide();
 }
 
 // Edit mode: normally the overlay is fully click-through (never intercepts a game
@@ -133,6 +142,7 @@ function setEditMode(on) {
   overlayWin.setIgnoreMouseEvents(!on, { forward: true });
   if (on) setOverlayShown(true);
   overlayWin.webContents.send('editmode', on);
+  console.log('[overlay] editmode', on, 'visible=', overlayWin.isVisible());
 }
 
 // ARAM: Mayhem augment reference (name/tier/description) for the overlay.
@@ -190,7 +200,9 @@ async function updateReco(snap) {
 }
 
 function registerShortcuts() {
-  globalShortcut.register('CommandOrControl+Shift+E', () => setEditMode(!editMode));
+  const e = globalShortcut.register('CommandOrControl+Shift+E', () => setEditMode(!editMode));
+  const o = globalShortcut.register('CommandOrControl+Shift+O', () => setOverlayShown(!overlayShouldShow));
+  console.log('[overlay] shortcuts registered E=', e, 'O=', o);
 }
 
 function trayIcon() {

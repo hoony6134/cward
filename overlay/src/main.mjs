@@ -35,7 +35,7 @@ app.whenReady().then(async () => {
   // app (what Finder / LaunchServices does), the always-on-top overlay does NOT
   // float over the game and stays invisible — but as an accessory (UIElement) app
   // it does. (Confirmed: a direct-exec launch runs as UIElement and the overlay
-  // shows; a Finder launch runs Foreground and it doesn't.) The regular focusable
+  // shows; a Finder launch runs Foreground and it doesn't.) The non-focusable
   // window + repaint-on-show + hide→reshow handler below keep it from vanishing on
   // click, which was the old accessory-app problem.
   if (process.platform === 'darwin') app.setActivationPolicy('accessory');
@@ -106,9 +106,11 @@ function createOverlay() {
     x: workArea.x, y: workArea.y, width: workArea.width, height: workArea.height,
     transparent: true, frame: false, hasShadow: false, backgroundColor: '#00000000',
     resizable: false, movable: false, skipTaskbar: true,
-    // NOTE: focusable stays true. A focusable:false window is ordered out by macOS
-    // when the app deactivates (clicking the game) → the overlay vanished on click.
-    // It's click-through during play anyway, so it never actually takes focus.
+    // Never take keyboard focus during play: a clicked panel would otherwise become
+    // the key window and swallow game keys (Flash etc.). Edit mode re-enables it so
+    // the augment search box can be typed into.
+    focusable: false,
+    acceptFirstMouse: true, // a never-key window must still take the very first click (cooldown chips)
     show: false, fullscreenable: false, enableLargerThanScreen: true,
     // Non-activating panel: clicking the overlay (cooldowns, augment toggle) must not
     // activate cward, or League loses focus and macOS switches the window/Space.
@@ -158,6 +160,7 @@ function setEditMode(on) {
   editMode = on;
   if (!overlayWin || overlayWin.isDestroyed()) return;
   overlayWin.setIgnoreMouseEvents(!on, { forward: true });
+  overlayWin.setFocusable(on); // keyboard only while editing (search box); never in play
   if (on) setOverlayShown(true);
   overlayWin.webContents.send('editmode', on);
   console.log('[overlay] editmode', on, 'visible=', overlayWin.isVisible());

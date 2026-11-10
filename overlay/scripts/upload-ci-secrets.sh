@@ -21,6 +21,19 @@ ASC_ISSUER="d7ebe0d0-2e11-4997-9f4d-aa0d9f819e57"
 
 read -r -s -p "내보낸 .p12 암호: " P12PW; echo
 
+# 러너와 똑같이 security import로 p12+암호를 먼저 검증한다. 암호가 틀리면 여기서 멈춤
+# (안 그러면 틀린 암호가 조용히 올라가서 CI에서야 터진다 — 지난번 그거).
+VKC="$HOME/Library/Keychains/cward-verify-$$.keychain-db"
+security create-keychain -p verifypw "$VKC" >/dev/null 2>&1
+if security import "$P12" -k "$VKC" -P "$P12PW" -T /usr/bin/codesign >/dev/null 2>&1; then
+  security delete-keychain "$VKC" >/dev/null 2>&1
+  echo "✓ p12 암호 확인됨"
+else
+  security delete-keychain "$VKC" >/dev/null 2>&1
+  echo "✗ p12 암호가 맞지 않습니다. 내보낼 때 정한 암호를 정확히 입력하거나, Keychain 접근에서 .p12를 새로 내보내세요."
+  exit 1
+fi
+
 base64 -i "$P12" | tr -d '\n' | gh secret set CSC_LINK          --repo "$REPO"
 printf %s "$P12PW"            | gh secret set CSC_KEY_PASSWORD   --repo "$REPO"
 base64 -i "$P8"  | tr -d '\n' | gh secret set APPLE_API_KEY_P8   --repo "$REPO"

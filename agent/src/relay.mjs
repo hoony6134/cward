@@ -1,14 +1,14 @@
 // WebSocket client to the Cloudflare relay with auto-reconnect and backoff.
 import WebSocket from 'ws';
 
-export function createRelay({ url, room, token, onStatus = () => {}, onCommand = () => {} }) {
+export function createRelay({ url, room, token, role = 'agent', onStatus = () => {}, onCommand = () => {} }) {
   let ws = null;
   let backoff = 1000;
   let closed = false;
 
   const connect = () => {
     if (closed) return;
-    const full = `${url}?room=${encodeURIComponent(room)}&role=agent&token=${encodeURIComponent(token)}`;
+    const full = `${url}?room=${encodeURIComponent(room)}&role=${role}&token=${encodeURIComponent(token)}`;
     ws = new WebSocket(full);
     ws.on('open', () => { backoff = 1000; onStatus('connected'); });
     ws.on('message', (d) => { try { onCommand(JSON.parse(d.toString())); } catch { /* ignore */ } });

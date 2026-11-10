@@ -33,7 +33,9 @@ import { DurableObject } from 'cloudflare:workers';
 export class RelayRoom extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    const role = url.searchParams.get('role') === 'agent' ? 'agent' : 'viewer';
+    const r = url.searchParams.get('role');
+    // peer = a teammate's overlay in a shared team room (cooldown sync); see below.
+    const role = r === 'agent' ? 'agent' : r === 'peer' ? 'peer' : 'viewer';
     const token = url.searchParams.get('token') || '';
     // Trust-on-first-use: the first connector fixes this room's token; others must match.
     const known = await this.ctx.storage.get<string>('token');
@@ -46,6 +48,12 @@ export class RelayRoom extends DurableObject<Env> {
     // Tag the socket with its role so we can target broadcasts after hibernation.
     this.ctx.acceptWebSocket(server, [role]);
 
+    if (role === 'peer') {
+      // Late joiner gets the room's current cooldowns, and everyone learns the head count.
+      const cds = (await this.ctx.storage.get<Record<string, number>>('cds')) ?? {};
+      try { server.send(JSON.stringify({ type: 'state', cds })); } catch { /* closing */ }
+      this.broadcastPeers();
+    }
     if (role === 'viewer') {
       // Send the last known snapshot immediately so a phone joining mid-game isn't blank.
       const last = await this.ctx.storage.get<string>('last');
@@ -56,6 +64,23 @@ export class RelayRoom extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    if (this.ctx.getTags(ws).includes('peer')) {
+      // Team cooldown sync: {type:'cd', k, endAt} where endAt is in GAME seconds
+      // (0 = cleared). Keep the room's latest per key and relay to the other peers.
+      let m: { type?: string; k?: unknown; endAt?: unknown };
+      try { m = JSON.parse(text); } catch { return; }
+      if (m.type !== 'cd' || typeof m.k !== 'string' || m.k.length > 120 || typeof m.endAt !== 'number') return;
+      const cds = (await this.ctx.storage.get<Record<string, number>>('cds')) ?? {};
+      cds[m.k] = m.endAt;
+      await this.ctx.storage.put('cds', cds);
+      // a game room is useless after the game: wipe it a few hours after first use
+      if ((await this.ctx.storage.getAlarm()) == null) await this.ctx.storage.setAlarm(Date.now() + 4 * 3600_000);
+      const out = JSON.stringify({ type: 'cd', k: m.k, endAt: m.endAt });
+      for (const p of this.ctx.getWebSockets('peer')) {
+        if (p !== ws) try { p.send(out); } catch { /* dead peer */ }
+      }
+      return;
+    }
     if (this.ctx.getTags(ws).includes('agent')) {
       // snapshot: store latest and fan out to viewers
       await this.ctx.storage.put('last', text);
@@ -72,5 +97,17 @@ export class RelayRoom extends DurableObject<Env> {
 
   async webSocketClose(ws: WebSocket, code: number) {
     try { ws.close(code, 'bye'); } catch { /* already closed */ }
+    if (this.ctx.getTags(ws).includes('peer')) this.broadcastPeers(ws);
+  }
+
+  // Tell every teammate how many cward overlays share this team room.
+  broadcastPeers(leaving?: WebSocket) {
+    const peers = this.ctx.getWebSockets('peer').filter((p) => p !== leaving);
+    const out = JSON.stringify({ type: 'peers', n: peers.length });
+    for (const p of peers) try { p.send(out); } catch { /* dead peer */ }
+  }
+
+  async alarm() {
+    await this.ctx.storage.deleteAll();
   }
 }
